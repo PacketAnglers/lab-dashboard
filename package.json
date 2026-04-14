@@ -1,0 +1,90 @@
+{
+  "name": "lab-dashboard",
+  "displayName": "Lab Dashboard",
+  "description": "Auto-opens LAB-READY.md in a custom preview that honors command: URIs for click-to-run VS Code actions. Built for aclabs / Arista Containerized Labs.",
+  "version": "0.4.0",
+  "publisher": "packetanglers",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PacketAnglers/lab-dashboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PacketAnglers/lab-dashboard/issues"
+  },
+  "homepage": "https://github.com/PacketAnglers/lab-dashboard#readme",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "containerlab",
+    "arista",
+    "aclabs"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "labDashboard.open",
+        "title": "Lab Dashboard: Open"
+      },
+      {
+        "command": "labDashboard.refresh",
+        "title": "Lab Dashboard: Refresh"
+      },
+      {
+        "command": "labDashboard.openTopology",
+        "title": "Lab Dashboard: Open Topology View"
+      },
+      {
+        "command": "labDashboard.openFile",
+        "title": "Lab Dashboard: Open File"
+      },
+      {
+        "command": "labDashboard.runInTerminal",
+        "title": "Lab Dashboard: Run in Terminal"
+      }
+    ],
+    "configuration": {
+      "title": "Lab Dashboard",
+      "properties": {
+        "labDashboard.filePattern": {
+          "type": "string",
+          "default": "**/LAB-READY.md",
+          "description": "Glob pattern(s) for dashboard files the extension watches for."
+        },
+        "labDashboard.autoOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open the dashboard preview when a matching file appears or changes."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run bundle",
+    "bundle": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npm run bundle && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0",
+    "markdown-it-task-lists": "^2.1.1"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.3.3"
+  }
+}
