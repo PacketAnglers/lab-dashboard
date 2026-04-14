@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import { renderDashboardHtml } from './renderer';
 
 /**
@@ -168,7 +169,7 @@ function openDashboard(
 		{
 			enableScripts: true,
 			retainContextWhenHidden: true,
-			localResourceRoots: [context.extensionUri, vscode.Uri.file(require('path').dirname(uri.fsPath))],
+			localResourceRoots: [context.extensionUri, vscode.Uri.file(path.dirname(uri.fsPath))],
 		}
 	);
 
@@ -222,11 +223,10 @@ function renderIntoPanel(
 		return;
 	}
 	panel.title = titleFor(uri);
-	panel.webview.html = renderDashboardHtml(markdown, panel.webview, uri);
+	panel.webview.html = renderDashboardHtml(markdown, panel.webview);
 }
 
 function titleFor(uri: vscode.Uri): string {
-	const path = require('path') as typeof import('path');
 	return `Lab Dashboard — ${path.basename(path.dirname(uri.fsPath))}`;
 }
 

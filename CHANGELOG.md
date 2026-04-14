@@ -4,6 +4,23 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-04-14
+
+### Changed
+- Code hygiene pass — no behavior change.
+- Consolidated `path` module imports (top-level `import * as path from 'path'`
+  instead of two scattered `require('path')` calls).
+- Dropped unused `sourceUri` parameter from `renderDashboardHtml`.
+
+### Documentation
+- Fixed broken install example in README — `code-server --install-extension`
+  treats bare URLs as relative filesystem paths, so the correct pattern is
+  `curl` first, then install from the downloaded local path.
+- Added a "Dashboard authoring" section documenting the CSS styling hooks
+  (`.lab-credentials`, `.lab-badge`, action-grid auto-wrapping, etc.) as
+  part of the extension's public contract for dashboard generators.
+- Bumped version references in install/release examples to current.
+
 ## [0.6.0] - 2026-04-14
 
 ### Changed

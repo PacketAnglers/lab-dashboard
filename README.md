@@ -37,21 +37,33 @@ boundary, no gate to satisfy.
 
 ### From GitHub Releases
 
+`code-server` treats bare URLs passed to `--install-extension` as relative
+filesystem paths, so download first, then install. Substitute `v0.6.0`
+for whichever [release](https://github.com/PacketAnglers/lab-dashboard/releases)
+you want:
+
 ```bash
-code-server --install-extension \
-  https://github.com/PacketAnglers/lab-dashboard/releases/download/v0.4.0/lab-dashboard-0.4.0.vsix \
-  --force
+VERSION=0.6.0
+curl -fsSL -o /tmp/lab-dashboard.vsix \
+  "https://github.com/PacketAnglers/lab-dashboard/releases/download/v${VERSION}/lab-dashboard-${VERSION}.vsix"
+code-server --install-extension /tmp/lab-dashboard.vsix --force
 ```
+
+Desktop VS Code accepts either a local path or a marketplace ID for
+`--install-extension`, so download+install works there too.
 
 ### From Dockerfile (baking into a base image)
 
 ```dockerfile
-ARG LAB_DASHBOARD_VERSION=0.4.0
+ARG LAB_DASHBOARD_VERSION=0.6.0
 RUN curl -fsSL -o /tmp/lab-dashboard.vsix \
       "https://github.com/PacketAnglers/lab-dashboard/releases/download/v${LAB_DASHBOARD_VERSION}/lab-dashboard-${LAB_DASHBOARD_VERSION}.vsix" \
     && code-server --install-extension /tmp/lab-dashboard.vsix --force \
     && rm /tmp/lab-dashboard.vsix
 ```
+
+Bump `LAB_DASHBOARD_VERSION` to roll out a new extension version to every
+lab on the next image rebuild.
 
 ## Settings
 
@@ -75,6 +87,61 @@ RUN curl -fsSL -o /tmp/lab-dashboard.vsix \
 - `https://…` / `http://…` — opened via `vscode.env.openExternal`.
 - `file://…`, relative paths, anchor links — default webview behavior.
 
+## Dashboard authoring
+
+The webview ships with styling hooks that dashboard generators can target
+for richer UI than plain markdown. These are part of the extension's
+public contract — they won't change without a version bump.
+
+### Action buttons
+
+Any `<a>` inside an `<h3>` is styled as a button (works for both `command:`
+and `https:` URIs). Example markdown:
+
+```markdown
+### [🔭 &nbsp; Open Topology View](command:labDashboard.openTopology?%5B%22/path/to/topology.clab.yml%22%5D)
+
+Launch the interactive ContainerLab topology graph in a new editor tab.
+```
+
+The paragraph immediately following an action h3 is rendered as a muted
+description (smaller, `descriptionForeground` color).
+
+### Credentials block
+
+Prominent callout with a blue left-border accent and pill-styled values:
+
+```html
+<div class="lab-credentials">
+  <span class="lab-credentials-label">Credentials</span>
+  <code class="lab-cred">admin</code>
+  <span class="lab-cred-sep">/</span>
+  <code class="lab-cred">admin</code>
+</div>
+```
+
+### Badge rows
+
+Two-tone GitHub-shields-style badges for version info, resource specs,
+or any key/value pairs. The container can have any label:
+
+```html
+<div class="lab-validated-with">
+  <span class="lab-validated-label">Validated with</span>
+  <span class="lab-badge">
+    <span class="lab-badge-key">cEOS</span>
+    <span class="lab-badge-val">4.35.2F</span>
+  </span>
+  <!-- more badges... -->
+</div>
+```
+
+### Action grid (automatic)
+
+Consecutive `## Quick Actions` and `## Lab Operations` sections are
+automatically wrapped into a responsive two-column grid. Heading-driven
+detection — see `ACTION_HEADING_RE` in `src/renderer.ts` to extend.
+
 ## Developing
 
 ```bash
@@ -92,11 +159,11 @@ extension loaded for interactive testing.
 2. Update `CHANGELOG.md`.
 3. Commit, tag, and push:
    ```bash
-   git tag v0.5.0
-   git push origin v0.5.0
+   git tag v0.7.0
+   git push origin main v0.7.0
    ```
-4. GitHub Actions automatically builds the `.vsix` and attaches it to a new
-   GitHub Release for that tag.
+4. GitHub Actions automatically builds the `.vsix` and attaches it to a
+   new GitHub Release for that tag.
 
 ## Security
 

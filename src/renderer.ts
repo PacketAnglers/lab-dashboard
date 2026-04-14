@@ -26,8 +26,7 @@ function md(): MarkdownIt {
  */
 export function renderDashboardHtml(
 	markdown: string,
-	webview: vscode.Webview,
-	sourceUri: vscode.Uri
+	webview: vscode.Webview
 ): string {
 	const body = wrapActionSections(md().render(markdown));
 	const nonce = makeNonce();
