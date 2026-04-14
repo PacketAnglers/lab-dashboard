@@ -4,6 +4,13 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-04-14
+
+### Changed
+- Action button styling now applies to any anchor inside an h3
+  (`h3 a[href]`), not just `command:` URIs. External https links
+  (e.g. documentation buttons) now render as proper buttons too.
+
 ## [0.5.0] - 2026-04-14
 
 ### Added

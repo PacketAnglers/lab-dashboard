@@ -353,8 +353,11 @@ function baseStyles(): string {
 			min-width: 0;
 		}
 
-		/* Action buttons: sized to content, not full width. */
-		h3 a[href^="command:"] {
+		/* Action buttons: sized to content, not full width. Applies to any
+		   anchor inside an h3 — covers command: URIs AND external https links
+		   (e.g. Tech Library guide buttons). h3 is only used for action
+		   buttons in the dashboard, so this selector is safe. */
+		h3 a[href] {
 			display: inline-block;
 			padding: 0.4em 0.9em;
 			background: var(--vscode-button-background);
@@ -364,13 +367,13 @@ function baseStyles(): string {
 			text-decoration: none;
 			font-weight: 500;
 		}
-		h3 a[href^="command:"]:hover {
+		h3 a[href]:hover {
 			background: var(--vscode-button-hoverBackground);
 			text-decoration: none;
 		}
 
 		/* Description paragraph immediately after an action button — tighter and muted. */
-		h3:has(a[href^="command:"]) + p {
+		h3:has(a[href]) + p {
 			margin: 0.2em 0 0.6em;
 			color: var(--vscode-descriptionForeground);
 			font-size: 0.9em;
