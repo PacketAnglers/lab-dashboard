@@ -266,6 +266,81 @@ function baseStyles(): string {
 		ul, ol { padding-left: 1.5em; margin: 0.4em 0; }
 		li + li { margin-top: 0.15em; }
 
+		/* ── Credentials block ─────────────────────────────────────────────
+		   Prominent callout with pill-styled values, sized for scanability. */
+		.lab-credentials {
+			display: flex;
+			align-items: center;
+			gap: 0.6em;
+			flex-wrap: wrap;
+			margin: 0.6em 0;
+			padding: 0.5em 0.9em;
+			background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.08));
+			border-left: 3px solid var(--vscode-textLink-foreground);
+			border-radius: 4px;
+			font-size: 1.05em;
+		}
+		.lab-credentials-label {
+			font-weight: 600;
+			color: var(--vscode-descriptionForeground);
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			font-size: 0.8em;
+		}
+		.lab-cred {
+			padding: 0.2em 0.7em;
+			background: var(--vscode-editor-background);
+			border: 1px solid var(--vscode-panel-border);
+			border-radius: 4px;
+			font-family: var(--vscode-editor-font-family, 'SF Mono', Menlo, Consolas, monospace);
+			font-weight: 600;
+			font-size: 1em;
+			color: var(--vscode-foreground);
+		}
+		.lab-cred-sep {
+			color: var(--vscode-descriptionForeground);
+			font-weight: 600;
+		}
+
+		/* ── Validated-with badge row ───────────────────────────────────── */
+		.lab-validated-with {
+			display: flex;
+			align-items: center;
+			gap: 0.5em;
+			flex-wrap: wrap;
+			margin: 0.6em 0 0.9em;
+		}
+		.lab-validated-label {
+			font-weight: 600;
+			color: var(--vscode-descriptionForeground);
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			font-size: 0.8em;
+			margin-right: 0.2em;
+		}
+		.lab-badge {
+			display: inline-flex;
+			align-items: stretch;
+			border-radius: 4px;
+			overflow: hidden;
+			border: 1px solid var(--vscode-panel-border);
+			font-size: 0.9em;
+			line-height: 1.5;
+		}
+		.lab-badge-key {
+			padding: 0.15em 0.55em;
+			background: var(--vscode-badge-background, var(--vscode-textBlockQuote-background, rgba(128,128,128,0.15)));
+			color: var(--vscode-badge-foreground, var(--vscode-foreground));
+			font-weight: 600;
+		}
+		.lab-badge-val {
+			padding: 0.15em 0.6em;
+			background: var(--vscode-editor-background);
+			color: var(--vscode-foreground);
+			font-family: var(--vscode-editor-font-family, 'SF Mono', Menlo, Consolas, monospace);
+			font-weight: 500;
+		}
+
 		/* Action sections side-by-side in a responsive grid. The wrapper is
 		   injected by the renderer so the dashboard markdown stays portable. */
 		.action-grid {

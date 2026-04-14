@@ -4,6 +4,22 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-14
+
+### Added
+- Styling hooks for a prominent credentials block: `.lab-credentials`,
+  `.lab-credentials-label`, `.lab-cred`, `.lab-cred-sep`. Credentials now
+  render as a callout with border-left accent, pill-styled values, and
+  `SMALL CAPS` label for scanability.
+- Styling hooks for a validated-with badge row: `.lab-validated-with`,
+  `.lab-validated-label`, `.lab-badge`, `.lab-badge-key`, `.lab-badge-val`.
+  Each entry renders as a two-tone pill (key on themed background,
+  value in monospace on editor background) — GitHub-shields-style.
+
+### Changed
+- Credentials no longer share the status line; they're their own block.
+- Validated-with entries promoted from `<sub>` to proper badge pills.
+
 ## [0.4.0] - 2026-04-13
 
 ### Changed
