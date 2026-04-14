@@ -35,31 +35,53 @@ boundary, no gate to satisfy.
 
 ## Installation
 
-### From GitHub Releases
+### From Open VSX Registry (recommended)
 
-`code-server` treats bare URLs passed to `--install-extension` as relative
-filesystem paths, so download first, then install. Substitute `v0.6.0`
-for whichever [release](https://github.com/PacketAnglers/lab-dashboard/releases)
-you want:
+The extension is published to the [Open VSX Registry](https://open-vsx.org/extension/packetanglers/lab-dashboard),
+which is the default registry for `code-server` and VS Code forks like
+VSCodium and Gitpod. Install with a single command:
 
 ```bash
-VERSION=0.6.0
+code-server --install-extension packetanglers.lab-dashboard --force
+```
+
+To pin a specific version:
+
+```bash
+code-server --install-extension packetanglers.lab-dashboard@0.7.0 --force
+```
+
+Desktop VS Code users can also use this marketplace ID form, or install
+from the [GitHub Releases](https://github.com/PacketAnglers/lab-dashboard/releases)
+page.
+
+### From GitHub Releases (fallback)
+
+For air-gapped environments or when Open VSX is unreachable, download the
+`.vsix` directly and install from the local path. (Note: `code-server`
+treats bare URLs passed to `--install-extension` as relative filesystem
+paths, so the download step is required.)
+
+```bash
+VERSION=0.7.0
 curl -fsSL -o /tmp/lab-dashboard.vsix \
   "https://github.com/PacketAnglers/lab-dashboard/releases/download/v${VERSION}/lab-dashboard-${VERSION}.vsix"
 code-server --install-extension /tmp/lab-dashboard.vsix --force
 ```
 
-Desktop VS Code accepts either a local path or a marketplace ID for
-`--install-extension`, so download+install works there too.
-
 ### From Dockerfile (baking into a base image)
 
+Simplest form, using Open VSX:
+
 ```dockerfile
-ARG LAB_DASHBOARD_VERSION=0.6.0
-RUN curl -fsSL -o /tmp/lab-dashboard.vsix \
-      "https://github.com/PacketAnglers/lab-dashboard/releases/download/v${LAB_DASHBOARD_VERSION}/lab-dashboard-${LAB_DASHBOARD_VERSION}.vsix" \
-    && code-server --install-extension /tmp/lab-dashboard.vsix --force \
-    && rm /tmp/lab-dashboard.vsix
+RUN code-server --install-extension packetanglers.lab-dashboard --force
+```
+
+Or pin the version for reproducible image builds:
+
+```dockerfile
+ARG LAB_DASHBOARD_VERSION=0.7.0
+RUN code-server --install-extension "packetanglers.lab-dashboard@${LAB_DASHBOARD_VERSION}" --force
 ```
 
 Bump `LAB_DASHBOARD_VERSION` to roll out a new extension version to every

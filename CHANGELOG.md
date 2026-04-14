@@ -4,6 +4,25 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-04-14
+
+### Added
+- **Open VSX Registry publishing.** Extension is now published to
+  [open-vsx.org](https://open-vsx.org) automatically on tag push, enabling
+  one-command install via marketplace ID:
+  ```bash
+  code-server --install-extension packetanglers.lab-dashboard --force
+  ```
+  No more curl-then-install dance for code-server users.
+- CI workflow step that gracefully skips Open VSX publishing when
+  `OPEN_VSX_TOKEN` is not configured (e.g., on forks or PRs), so the
+  release pipeline doesn't break for contributors without publish credentials.
+
+### Changed
+- Install documentation in README updated to show marketplace ID install
+  as the primary path, with curl+install as a fallback for air-gapped or
+  offline environments.
+
 ## [0.6.1] - 2026-04-14
 
 ### Changed

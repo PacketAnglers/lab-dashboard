@@ -2,7 +2,7 @@
   "name": "lab-dashboard",
   "displayName": "Lab Dashboard",
   "description": "Auto-opens LAB-READY.md in a custom preview that honors command: URIs for click-to-run VS Code actions. Built for aclabs / Arista Containerized Labs.",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "publisher": "packetanglers",
   "license": "MIT",
   "repository": {
