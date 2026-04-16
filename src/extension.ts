@@ -79,11 +79,16 @@ export function activate(context: vscode.ExtensionContext) {
 				refreshDashboard(entry.uri, output);
 			}
 		}),
-		// Open the topology file AND fire the containerlab TopoViewer command.
+		// Open the topology file AND fire the containerlab TopoViewer command,
+		// then close the topology file tab automatically — it was only opened
+		// to satisfy TopoViewer's `activeTextEditor` requirement, and once
+		// the viewer is up the file editor is just visual clutter.
+		//
 		// Needed because:
-		//   * `vscode.open` returns a thenable that doesn't resolve until the editor
-		//     is the active one; runCommands fires the next command synchronously
-		//     so getSelectedLabNode (called by topoViewer) sees no active editor.
+		//   * `vscode.open` returns a thenable that doesn't resolve until the
+		//     editor is the active one; runCommands fires the next command
+		//     synchronously so getSelectedLabNode (called by topoViewer) sees
+		//     no active editor.
 		//   * Awaiting both here, in our extension, sidesteps the race entirely.
 		vscode.commands.registerCommand('labDashboard.openTopology', async (topologyPath: string) => {
 			if (!topologyPath || typeof topologyPath !== 'string') {
@@ -98,6 +103,21 @@ export function activate(context: vscode.ExtensionContext) {
 				// before the containerlab extension queries activeTextEditor.
 				await new Promise((r) => setTimeout(r, 150));
 				await vscode.commands.executeCommand('containerlab.lab.graph.topoViewer');
+
+				// Close the topology file tab. TopoViewer has already read what
+				// it needs from activeTextEditor by this point, so the file
+				// editor is no longer serving a purpose. Use the Tab API to
+				// target this specific tab regardless of which tab is currently
+				// active — that way we don't accidentally close the TopoViewer
+				// webview itself.
+				const allTabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs);
+				const topologyTab = allTabs.find((t) =>
+					t.input instanceof vscode.TabInputText &&
+					t.input.uri.fsPath === uri.fsPath
+				);
+				if (topologyTab) {
+					await vscode.window.tabGroups.close(topologyTab);
+				}
 			} catch (exc) {
 				output.appendLine(`[labDashboard] openTopology failed: ${exc}`);
 				vscode.window.showErrorMessage(`Open Topology failed: ${String(exc)}`);
