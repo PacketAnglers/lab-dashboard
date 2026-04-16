@@ -152,6 +152,38 @@ export function activate(context: vscode.ExtensionContext) {
 			term.sendText(cmd, true);
 		})
 	);
+
+	// ── Auto-launch init_lab.py in the bottom panel ────────────────────────
+	//
+	// If the workspace contains assets/init_lab.py, launch it automatically
+	// in a Panel-located terminal. This puts the boot TUI in the bottom
+	// panel while leaving the editor area free for README.md, SSH tabs, etc.
+	//
+	// We use TerminalLocation.Panel explicitly so init_lab always opens in
+	// the bottom panel regardless of the terminal.integrated.defaultLocation
+	// setting — that setting is typically "editor" to give users tabbed SSH
+	// sessions when they right-click nodes in the topology viewer.
+	//
+	// This replaces the tasks.json "runOn: folderOpen" approach, which
+	// couldn't control terminal location (no per-task location override
+	// in VS Code's task schema as of 2025).
+	if (vscode.workspace.workspaceFolders?.length) {
+		for (const folder of vscode.workspace.workspaceFolders) {
+			const initScript = path.join(folder.uri.fsPath, 'assets', 'init_lab.py');
+			if (fs.existsSync(initScript)) {
+				output.appendLine(`[labDashboard] found init_lab: ${initScript}`);
+				const term = vscode.window.createTerminal({
+					name: 'init_lab',
+					location: vscode.TerminalLocation.Panel,
+					cwd: folder.uri,
+				});
+				term.show(true); // true = preserve focus on the editor area
+				term.sendText(`python3 ${initScript}`, true);
+				output.appendLine('[labDashboard] init_lab launched in panel terminal');
+				break; // one lab per workspace — don't launch multiple
+			}
+		}
+	}
 }
 
 export function deactivate() {
