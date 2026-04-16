@@ -153,34 +153,74 @@ export function activate(context: vscode.ExtensionContext) {
 		})
 	);
 
-	// ── Auto-launch init_lab.py in the bottom panel ────────────────────────
+	// ── Auto-launch init_lab.py ─────────────────────────────────────────────
 	//
-	// If the workspace contains assets/init_lab.py, launch it automatically
-	// in a Panel-located terminal. This puts the boot TUI in the bottom
-	// panel while leaving the editor area free for README.md, SSH tabs, etc.
+	// If the workspace contains assets/init_lab.py, launch it in an editor-
+	// area terminal tab. We wait for the IDE's startup layout to settle
+	// (i.e., for the first editor to become active — typically README.md via
+	// code-server's workbench.startupEditor setting) before creating the
+	// terminal. This guarantees init_lab opens AFTER README.md, so its tab
+	// takes focus and the user sees the boot TUI immediately. README.md
+	// becomes a background tab that's one click away.
 	//
-	// We use TerminalLocation.Panel explicitly so init_lab always opens in
-	// the bottom panel regardless of the terminal.integrated.defaultLocation
-	// setting — that setting is typically "editor" to give users tabbed SSH
-	// sessions when they right-click nodes in the topology viewer.
+	// Fallback: if no editor opens within 5 seconds (e.g., no README in the
+	// lab, or startupEditor is "none"), we launch init_lab anyway.
 	//
 	// This replaces the tasks.json "runOn: folderOpen" approach, which
-	// couldn't control terminal location (no per-task location override
-	// in VS Code's task schema as of 2025).
+	// couldn't guarantee tab ordering relative to README.md.
 	if (vscode.workspace.workspaceFolders?.length) {
+		let initScript: string | undefined;
+		let initCwd: vscode.Uri | undefined;
+
 		for (const folder of vscode.workspace.workspaceFolders) {
-			const initScript = path.join(folder.uri.fsPath, 'assets', 'init_lab.py');
-			if (fs.existsSync(initScript)) {
-				output.appendLine(`[labDashboard] found init_lab: ${initScript}`);
+			const candidate = path.join(folder.uri.fsPath, 'assets', 'init_lab.py');
+			if (fs.existsSync(candidate)) {
+				initScript = candidate;
+				initCwd = folder.uri;
+				break;
+			}
+		}
+
+		if (initScript) {
+			output.appendLine(`[labDashboard] found init_lab: ${initScript}`);
+
+			const doLaunch = () => {
 				const term = vscode.window.createTerminal({
 					name: 'init_lab',
-					location: vscode.TerminalLocation.Panel,
-					cwd: folder.uri,
+					cwd: initCwd,
 				});
-				term.show(true); // true = preserve focus on the editor area
+				term.show(false); // false = take focus so user sees the TUI
 				term.sendText(`python3 ${initScript}`, true);
-				output.appendLine('[labDashboard] init_lab launched in panel terminal');
-				break; // one lab per workspace — don't launch multiple
+				output.appendLine('[labDashboard] init_lab launched');
+			};
+
+			if (vscode.window.activeTextEditor) {
+				// README (or another editor) is already active — IDE has
+				// settled its startup layout. Launch immediately.
+				doLaunch();
+			} else {
+				// Wait for the first editor to become active (README opening),
+				// then launch so our terminal tab takes focus over README.
+				let launched = false;
+				const editorListener = vscode.window.onDidChangeActiveTextEditor((editor) => {
+					if (editor && !launched) {
+						launched = true;
+						editorListener.dispose();
+						doLaunch();
+					}
+				});
+				context.subscriptions.push(editorListener);
+
+				// Fallback: if no editor opens within 5 seconds, launch anyway.
+				// Covers edge cases like startupEditor: "none" or no README.md.
+				setTimeout(() => {
+					if (!launched) {
+						launched = true;
+						editorListener.dispose();
+						output.appendLine('[labDashboard] init_lab fallback launch (no editor opened)');
+						doLaunch();
+					}
+				}, 5000);
 			}
 		}
 	}
