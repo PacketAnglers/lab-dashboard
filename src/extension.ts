@@ -150,6 +150,21 @@ export function activate(context: vscode.ExtensionContext) {
 			const term = vscode.window.createTerminal({ name: cmd.split(/\s+/)[0] || 'lab' });
 			term.show();
 			term.sendText(cmd, true);
+		}),
+		// Open a fresh terminal in the bottom panel. The global setting
+		// terminal.integrated.defaultLocation is typically "editor" so SSH
+		// sessions open as tabs — but users also need a traditional panel
+		// terminal for shell commands (make build, make deploy, etc.).
+		// This command explicitly targets TerminalLocation.Panel so users
+		// get the "terminal at the bottom of the screen" experience they
+		// expect, without changing the global setting.
+		vscode.commands.registerCommand('labDashboard.openTerminal', () => {
+			output.appendLine('[labDashboard] openTerminal: panel');
+			const term = vscode.window.createTerminal({
+				name: 'Terminal',
+				location: vscode.TerminalLocation.Panel,
+			});
+			term.show();
 		})
 	);
 
