@@ -30,6 +30,21 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const pattern = getPattern();
 
+	// ── Status bar button ──────────────────────────────────────────────────
+	// Permanent "📋 Lab Dashboard" button in the bottom status bar. One click
+	// reopens the dashboard webview regardless of whether the user closed the
+	// tab, never opened it, or just can't find it. Zero discovery friction —
+	// always visible, always works.
+	const statusBarItem = vscode.window.createStatusBarItem(
+		vscode.StatusBarAlignment.Left,
+		100, // priority — higher values place the item further left
+	);
+	statusBarItem.text = '$(preview) Lab Dashboard';
+	statusBarItem.tooltip = 'Open the Lab Dashboard';
+	statusBarItem.command = 'labDashboard.open';
+	statusBarItem.show();
+	context.subscriptions.push(statusBarItem);
+
 	// Watch for creation/modification/deletion. We deliberately do NOT scan
 	// for existing files at activation — a LAB-READY.md left over from a prior
 	// session would otherwise auto-open with stale data while the lab is still
