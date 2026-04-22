@@ -202,18 +202,33 @@ export function activate(context: vscode.ExtensionContext) {
 		let initScript: string | undefined;
 		let initCwd: vscode.Uri | undefined;
 
-		for (const folder of vscode.workspace.workspaceFolders) {
-			const candidate = path.join(folder.uri.fsPath, 'assets', 'init_lab.py');
-			if (fs.existsSync(candidate)) {
-				initScript = candidate;
-				initCwd = folder.uri;
-				break;
+		// Resolution order:
+		//   1. /bin/init_lab.py  — bundled by lab-base-techlib (preferred)
+		//   2. <workspace>/assets/init_lab.py  — per-lab override / legacy labs
+		//   3. neither           — silently do nothing
+		//
+		// The bundled path wins because it gives us single-source-of-truth
+		// versioning tied to the container image tag. Workspace-local remains
+		// as an escape hatch for labs that need a custom init without waiting
+		// for a new lab-base-techlib release.
+		const bundled = '/bin/init_lab.py';
+		if (fs.existsSync(bundled)) {
+			initScript = bundled;
+			initCwd = vscode.workspace.workspaceFolders[0].uri;
+			output.appendLine(`[labDashboard] using bundled init_lab: ${bundled}`);
+		} else {
+			for (const folder of vscode.workspace.workspaceFolders) {
+				const candidate = path.join(folder.uri.fsPath, 'assets', 'init_lab.py');
+				if (fs.existsSync(candidate)) {
+					initScript = candidate;
+					initCwd = folder.uri;
+					output.appendLine(`[labDashboard] using workspace init_lab: ${candidate}`);
+					break;
+				}
 			}
 		}
 
 		if (initScript) {
-			output.appendLine(`[labDashboard] found init_lab: ${initScript}`);
-
 			const doLaunch = () => {
 				const term = vscode.window.createTerminal({
 					name: 'init_lab',

@@ -4,6 +4,23 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-04-21
+
+### Added
+- **Container-bundled `init_lab.py` support.** The extension now checks
+  `/bin/init_lab.py` first when auto-launching the lab init script, falling
+  back to `<workspace>/assets/init_lab.py` if the bundled path is not
+  present. This enables lab-base-techlib (and any future lab-base variant)
+  to ship a single versioned `init_lab.py` that every lab uses by default,
+  while preserving the workspace-local path as a per-lab override escape
+  hatch. If neither exists, the extension silently does nothing — same
+  behavior as before.
+
+### Changed
+- Output channel logging for init_lab discovery now distinguishes between
+  the bundled path and the workspace fallback, making it easier to debug
+  which source the extension resolved to.
+
 ## [0.7.0] - 2026-04-14
 
 ### Added
