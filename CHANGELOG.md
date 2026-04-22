@@ -4,6 +4,32 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-04-22
+
+### Changed
+- **SSH pills are larger and more legible.** Padding bumped from
+  `0.3em 0.7em` to `0.45em 0.9em`; font-size from `0.85em` to `0.95em`.
+  Still compact enough to fit many per row, but readable at a glance
+  without squinting.
+- **SSH pill hover adopts Arista Blue (`#16325b`) with white text.**
+  Ties the pills to the PacketAnglers / Arista visual identity and
+  creates a clear hierarchy — SSH pills are the brand-colored node
+  interaction, Quick Action buttons remain VS Code theme-driven.
+- **Quick Action buttons get a more pronounced hover effect.** Added
+  a 1px lift via `transform: translateY(-1px)` plus a soft drop
+  shadow. Transition bumped from 0.1s to 0.15s so the interaction
+  feels intentional rather than snappy. Both button systems now
+  share the lift + shadow, differing only in their hover color —
+  cohesive but distinguishable.
+- Added `:active` states on both button systems that reset the lift,
+  giving visual feedback at the moment of the click.
+- The `$` prefix on SSH pills becomes slightly more opaque on hover
+  (0.5 → 0.85), reinforcing the active state.
+
+### Compatibility
+- Pure CSS polish; no behavior changes, no new commands, no breaking
+  changes. Safe in-place upgrade from 0.14.0.
+
 ## [0.14.0] - 2026-04-22
 
 ### Added

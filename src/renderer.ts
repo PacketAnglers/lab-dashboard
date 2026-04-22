@@ -362,13 +362,23 @@ function baseStyles(): string {
 			background: var(--vscode-button-background);
 			color: var(--vscode-button-foreground) !important;
 			border-radius: 4px;
-			transition: background 0.1s;
+			transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 			text-decoration: none;
 			font-weight: 500;
 		}
 		h3 a[href]:hover {
 			background: var(--vscode-button-hoverBackground);
+			transform: translateY(-1px);
+			/* Soft shadow reinforces the "lift" — the button looks like it's
+			   physically rising off the page rather than just changing color.
+			   Using a translucent black lets the effect work on both light
+			   and dark VS Code themes without hardcoding a shadow color. */
+			box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 			text-decoration: none;
+		}
+		h3 a[href]:active {
+			transform: translateY(0);
+			box-shadow: none;
 		}
 
 		/* Description paragraph immediately after an action button — tighter and muted. */
@@ -403,27 +413,41 @@ function baseStyles(): string {
 		}
 		.lab-ssh-pill {
 			display: inline-block;
-			padding: 0.3em 0.7em;
+			padding: 0.45em 0.9em;
 			border-radius: 4px;
 			background: var(--vscode-badge-background, var(--vscode-textBlockQuote-background, rgba(128,128,128,0.15)));
 			color: var(--vscode-badge-foreground, var(--vscode-foreground)) !important;
 			font-family: var(--vscode-editor-font-family, 'SF Mono', Menlo, Consolas, monospace);
-			font-size: 0.85em;
+			font-size: 0.95em;
 			font-weight: 500;
 			text-decoration: none;
 			border: 1px solid transparent;
-			transition: background 0.1s, border-color 0.1s;
+			transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 		}
 		.lab-ssh-pill:hover {
-			background: var(--vscode-button-background);
-			color: var(--vscode-button-foreground) !important;
-			border-color: var(--vscode-button-background);
+			/* Arista Blue — the hover color ties SSH pills to the PacketAnglers
+			   / Arista visual identity and distinguishes them from the generic
+			   VS Code theme-driven Quick Action hover. White text required
+			   because #16325b is too dark for default foreground. !important
+			   overrides the badge-foreground variable set in the base rule. */
+			background: #16325b;
+			color: #ffffff !important;
+			border-color: #16325b;
+			transform: translateY(-1px);
+			box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 			text-decoration: none;
+		}
+		.lab-ssh-pill:active {
+			transform: translateY(0);
+			box-shadow: none;
 		}
 		/* Subtle "$" prefix to telegraph "this clicks into a terminal" */
 		.lab-ssh-pill::before {
 			content: '$ ';
 			opacity: 0.5;
+		}
+		.lab-ssh-pill:hover::before {
+			opacity: 0.85;
 		}
 
 		sub, sup { font-size: 0.8em; }
