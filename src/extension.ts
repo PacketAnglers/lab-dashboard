@@ -21,7 +21,18 @@ interface PanelEntry {
 	uri: vscode.Uri;
 }
 
+interface SshToNodeArgs {
+	node: string;
+	user?: string;
+}
+
 const openPanels = new Map<string, PanelEntry>();
+
+// Per-node SSH terminal registry. Keyed by node name; values are the most
+// recent terminal we created for that node. Reused on subsequent clicks
+// instead of spawning duplicates. Entries are cleaned up by the
+// onDidCloseTerminal listener registered in activate().
+const sshTerminals = new Map<string, vscode.Terminal>();
 
 export function activate(context: vscode.ExtensionContext) {
 	const output = vscode.window.createOutputChannel('Lab Dashboard');
@@ -44,6 +55,23 @@ export function activate(context: vscode.ExtensionContext) {
 	statusBarItem.command = 'labDashboard.open';
 	statusBarItem.show();
 	context.subscriptions.push(statusBarItem);
+
+	// Clean up the sshTerminals registry when a tracked terminal closes.
+	// Without this, a closed-then-reopened SSH session would briefly hit
+	// the "stillAlive" check on a stale reference before falling through
+	// to recreate. Cheap to maintain explicitly, and keeps the registry
+	// honest for any future code that wants to enumerate active sessions.
+	context.subscriptions.push(
+		vscode.window.onDidCloseTerminal((closed) => {
+			for (const [node, term] of sshTerminals) {
+				if (term === closed) {
+					sshTerminals.delete(node);
+					output.appendLine(`[labDashboard] sshToNode: terminal closed for ${node}`);
+					break;
+				}
+			}
+		})
+	);
 
 	// Watch for creation/modification/deletion. We deliberately do NOT scan
 	// for existing files at activation — a LAB-READY.md left over from a prior
@@ -180,6 +208,49 @@ export function activate(context: vscode.ExtensionContext) {
 				location: vscode.TerminalLocation.Panel,
 			});
 			term.show();
+		}),
+		// SSH to a lab node by hostname/alias (typically the entries written
+		// to ~/.ssh/config by init_lab.py's populate_ssh_config). Per-node
+		// terminal reuse: clicking the same node twice surfaces the existing
+		// terminal instead of spawning a duplicate.
+		//
+		// Args: { node: string, user?: string }
+		//   node — required; the SSH target (matches a Host alias in ssh config)
+		//   user — optional; defaults to "admin", which is the lab convention
+		//
+		// Behavior: opens (or focuses) a terminal named after the node,
+		// types `ssh <user>@<node>`, and presses Enter. One click → logged in.
+		vscode.commands.registerCommand('labDashboard.sshToNode', async (args: SshToNodeArgs) => {
+			const node = args?.node;
+			const user = args?.user || 'admin';
+
+			if (!node || typeof node !== 'string') {
+				vscode.window.showErrorMessage(
+					'labDashboard.sshToNode: missing or invalid "node" argument'
+				);
+				return;
+			}
+
+			// Check our registry for an existing terminal for this node.
+			// We track by node name rather than by terminal reference so we
+			// can detect terminals the user closed (which removes them from
+			// vscode.window.terminals). If our cached reference is stale,
+			// we recreate.
+			const existing = sshTerminals.get(node);
+			const stillAlive = existing && vscode.window.terminals.includes(existing);
+
+			if (stillAlive) {
+				output.appendLine(`[labDashboard] sshToNode: reusing terminal for ${node}`);
+				existing.show(false); // false = take focus
+				return;
+			}
+
+			output.appendLine(`[labDashboard] sshToNode: opening terminal for ${user}@${node}`);
+			const term = vscode.window.createTerminal({ name: node });
+			sshTerminals.set(node, term);
+			term.show(false);
+			// true = include trailing newline → command runs immediately
+			term.sendText(`ssh ${user}@${node}`, true);
 		})
 	);
 

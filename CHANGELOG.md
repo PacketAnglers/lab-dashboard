@@ -4,6 +4,31 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-04-22
+
+### Added
+- **`labDashboard.sshToNode` command.** Opens a terminal pre-typed with
+  `ssh <user>@<node>` and runs it immediately — one click goes from
+  dashboard to logged-in shell. Supports per-node terminal reuse:
+  clicking the same node twice surfaces the existing terminal instead
+  of spawning a duplicate.
+
+  Args: `{ node: string, user?: string }`. The `user` argument defaults
+  to `"admin"` (the lab convention). Stale terminals (closed by the
+  user, then re-clicked) are detected and replaced cleanly via the
+  `onDidCloseTerminal` listener.
+
+- **SSH pill grid CSS.** New `.lab-ssh-group`, `.lab-ssh-group-label`,
+  `.lab-ssh-pills`, and `.lab-ssh-pill` classes for compact, flex-wrap
+  pill layouts that scale from 4 to 30+ nodes without dominating the
+  dashboard. Pills use the editor's monospace font, a subtle `$` prefix
+  to telegraph terminal action, and a hover state that adopts the
+  primary button color.
+
+### Pairs with
+- lab-base-techlib 1.0.4+ which extends `init_lab.py` to render an
+  "SSH to Nodes" section in `LAB-READY.md` using the new command.
+
 ## [0.13.0] - 2026-04-22
 
 ### Changed

@@ -378,6 +378,54 @@ function baseStyles(): string {
 			font-size: 0.9em;
 		}
 
+		/* SSH-to-node pill grid. One pill per node, grouped by role.
+		   Compact (auto-sized to content), monospace, hover-highlighted.
+		   Scales cleanly from 4 to 30+ nodes without dominating the
+		   dashboard. The .lab-ssh-group label sits above each row of pills.
+		   The flex wrap means rows fill the available width and break
+		   naturally — no fixed grid column count to fight against. */
+		.lab-ssh-group {
+			margin: 0.6em 0 1em;
+		}
+		.lab-ssh-group-label {
+			display: block;
+			margin-bottom: 0.4em;
+			color: var(--vscode-descriptionForeground);
+			font-size: 0.85em;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+		.lab-ssh-pills {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.4em;
+		}
+		.lab-ssh-pill {
+			display: inline-block;
+			padding: 0.3em 0.7em;
+			border-radius: 4px;
+			background: var(--vscode-badge-background, var(--vscode-textBlockQuote-background, rgba(128,128,128,0.15)));
+			color: var(--vscode-badge-foreground, var(--vscode-foreground)) !important;
+			font-family: var(--vscode-editor-font-family, 'SF Mono', Menlo, Consolas, monospace);
+			font-size: 0.85em;
+			font-weight: 500;
+			text-decoration: none;
+			border: 1px solid transparent;
+			transition: background 0.1s, border-color 0.1s;
+		}
+		.lab-ssh-pill:hover {
+			background: var(--vscode-button-background);
+			color: var(--vscode-button-foreground) !important;
+			border-color: var(--vscode-button-background);
+			text-decoration: none;
+		}
+		/* Subtle "$" prefix to telegraph "this clicks into a terminal" */
+		.lab-ssh-pill::before {
+			content: '$ ';
+			opacity: 0.5;
+		}
+
 		sub, sup { font-size: 0.8em; }
 		small { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
 		img { max-width: 100%; height: auto; }
