@@ -4,6 +4,28 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.2] - 2026-04-22
+
+### Changed
+- **Quick Action buttons are larger and more substantial.** Padding
+  bumped from `0.4em 0.9em` to `0.6em 1.2em` and font-size set
+  explicitly to `1em` (was inheriting a smaller size from context,
+  which made buttons look thin per user feedback). Buttons now feel
+  like confident click targets rather than links wearing a costume.
+- **Shape parity with SSH pills.** Quick Actions and SSH pills now
+  share the same lift + shadow family on hover and the same `:active`
+  press-feedback reset. They feel like members of the same control
+  family.
+- **Deliberate hierarchy preserved.** Quick Actions keep the VS Code
+  theme-driven hover color (not Arista Blue). SSH pills remain the
+  single branded interaction on the dashboard — that distinction is
+  what lets the brand color *mean* something rather than becoming
+  "what happens when you hover on anything."
+
+### Compatibility
+- Pure CSS polish; no behavior changes, no new commands, no breaking
+  changes. Safe in-place upgrade from 0.14.1.
+
 ## [0.14.1] - 2026-04-22
 
 ### Changed

@@ -355,16 +355,26 @@ function baseStyles(): string {
 		/* Action buttons: sized to content, not full width. Applies to any
 		   anchor inside an h3 — covers command: URIs AND external https links
 		   (e.g. Tech Library guide buttons). h3 is only used for action
-		   buttons in the dashboard, so this selector is safe. */
+		   buttons in the dashboard, so this selector is safe.
+
+		   Sized to feel like the SSH pills' siblings — same lift + shadow
+		   family, but keeps the VS Code theme-driven hover color (rather
+		   than Arista Blue) so the dashboard preserves a clear hierarchy:
+		   Quick Actions are navigational, SSH pills are the branded
+		   node-interaction surface. */
 		h3 a[href] {
 			display: inline-block;
-			padding: 0.4em 0.9em;
+			padding: 0.6em 1.2em;
 			background: var(--vscode-button-background);
 			color: var(--vscode-button-foreground) !important;
 			border-radius: 4px;
 			transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 			text-decoration: none;
 			font-weight: 500;
+			/* Explicit font-size so buttons don't inherit the smaller text
+			   from the surrounding context, which was making them look
+			   thin and small per user feedback. */
+			font-size: 1em;
 		}
 		h3 a[href]:hover {
 			background: var(--vscode-button-hoverBackground);
