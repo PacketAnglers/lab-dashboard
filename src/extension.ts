@@ -239,9 +239,23 @@ export function activate(context: vscode.ExtensionContext) {
 				output.appendLine('[labDashboard] init_lab launched');
 			};
 
-			if (vscode.window.activeTextEditor) {
-				// README (or another editor) is already active — IDE has
-				// settled its startup layout. Launch immediately.
+			// Focus-race avoidance is only needed when the IDE is configured
+			// to auto-open README on startup — in that case, README opens
+			// after our activation and competes with the init_lab terminal
+			// for focus. We deterministically order by waiting for the
+			// README's editor event before creating the terminal.
+			//
+			// When startupEditor is anything else ("none", "welcomePage",
+			// "newUntitledFile", etc.), no README auto-opens, no race
+			// exists, and we launch immediately — no dead air.
+			const startupEditor = vscode.workspace
+				.getConfiguration('workbench')
+				.get<string>('startupEditor', 'welcomePage');
+			const mayOpenReadme = startupEditor === 'readme';
+
+			if (vscode.window.activeTextEditor || !mayOpenReadme) {
+				// Either an editor is already active (IDE layout settled),
+				// or no README is expected to open — launch immediately.
 				doLaunch();
 			} else {
 				// Wait for the first editor to become active (README opening),
@@ -257,7 +271,9 @@ export function activate(context: vscode.ExtensionContext) {
 				context.subscriptions.push(editorListener);
 
 				// Fallback: if no editor opens within 5 seconds, launch anyway.
-				// Covers edge cases like startupEditor: "none" or no README.md.
+				// Covers the edge case of startupEditor="readme" in a workspace
+				// that has no README.md — the event never fires, so we must
+				// still proceed eventually.
 				setTimeout(() => {
 					if (!launched) {
 						launched = true;

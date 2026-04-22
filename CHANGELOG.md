@@ -4,6 +4,26 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-04-22
+
+### Changed
+- **Conditional init_lab launch delay.** The 5-second wait for an editor
+  event before launching `init_lab.py` was introduced in 0.11.x to
+  deterministically order the terminal tab relative to an auto-opening
+  README. It now fires only when `workbench.startupEditor` is actually
+  set to `readme`. When the setting is `none`, `welcomePage`, or any
+  other value, no README auto-opens and no race exists, so `init_lab`
+  launches immediately — eliminating the dead air users saw between
+  code-server boot and the init TUI appearing.
+- The 5-second fallback remains in place for the `startupEditor=readme`
+  path, in case the workspace is configured to open README but no
+  README.md file exists.
+
+### Compatibility
+- Works with any value of `workbench.startupEditor`. Pairs particularly
+  well with lab-base-techlib 1.0.2+ which removes the `startupEditor`
+  setting entirely for a zero-delay boot experience.
+
 ## [0.12.0] - 2026-04-21
 
 ### Added
