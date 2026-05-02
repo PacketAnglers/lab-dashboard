@@ -4,6 +4,26 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-05-02
+
+### Changed
+- **Hide inline `Validated with` / `Resources` labels.** The badge
+  rows in the hero card now render flush-left without their leading
+  label text, matching `sandbox-dashboard`'s badge alignment exactly.
+  Per Mitch (live-test feedback): "to make these pills left aligned
+  with each other, much like the sandbox-lab." The labels are still
+  emitted by `init_lab.py`'s `_render_badge_row()` helper in
+  `lab-base-techlib`; they're hidden via `display: none` here, which
+  keeps the markup contract stable and avoids a coordinated
+  cross-repo change for what's purely a visual tweak.
+- **Future cleanup queued.** When `lab-base-techlib`'s `init_lab.py`
+  drops the label emission (separate non-urgent rev), this CSS rule
+  and its matching class can be removed altogether.
+
+### Compatibility
+- Pure CSS polish; no behavior changes, no new commands, no breaking
+  changes. Safe in-place upgrade from 0.15.0.
+
 ## [0.15.0] - 2026-05-02
 
 ### Changed

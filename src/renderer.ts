@@ -457,13 +457,16 @@ function baseStyles(): string {
 			flex-wrap: wrap;
 			margin: 0.55em 0 0;
 		}
+		/* v0.15.1: hide the inline "Validated with" / "Resources" labels
+		   so the badge rows sit flush-left, matching sandbox-dashboard's
+		   badge alignment. The labels are still emitted by init_lab.py's
+		   _render_badge_row() helper; they just render as zero-width
+		   here. Future cleanup: drop the label emission from init_lab.py
+		   and remove this rule with the matching .lab-validated-label
+		   class altogether. Until then, display: none keeps the markup
+		   stable and the visual goal direct. */
 		#lab-overview .lab-validated-label {
-			font-weight: 600;
-			color: #58585B;
-			text-transform: uppercase;
-			letter-spacing: 0.05em;
-			font-size: 0.78em;
-			margin-right: 0.2em;
+			display: none;
 		}
 		#lab-overview .lab-badge {
 			display: inline-flex;
