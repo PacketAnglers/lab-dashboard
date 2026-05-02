@@ -4,7 +4,49 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.15.1] - 2026-05-02
+## [0.15.2] - 2026-05-02
+
+Security hardening identified by an end-of-day Zamboni audit pass.
+Two MEDIUM-severity findings fixed; neither was RCE-class or auth-
+bypass-class, but both close real defense-in-depth gaps.
+
+### Security
+
+- **`command:` URI dispatcher now allowlists command IDs.** The
+  webview-to-extension command dispatcher in `executeCommandUri()`
+  previously accepted any `commandId` and forwarded it to
+  `vscode.commands.executeCommand()`. Threat model: an attacker
+  with workspace write access (post-compromise) could plant a
+  poisoned `LAB-READY.md` whose `<a href="command:…">` links
+  triggered arbitrary VS Code commands — including ones from
+  VS Code's broad command surface that the extension never
+  intended to expose. The dispatcher now rejects any command ID
+  not in `ALLOWED_COMMAND_IDS`, which lists exactly the seven
+  commands this extension registers in `activate()` (the six
+  declared in `package.json`'s `contributes.commands` plus
+  `labDashboard.sshToNode` registered in code).
+
+- **HTML-escape error-fallback interpolations.** The webview HTML
+  fallback rendered when `LAB-READY.md` cannot be read previously
+  interpolated `uri.fsPath` and the exception message into the
+  fallback HTML without escaping. The webview's CSP would have
+  blocked any script execution this could enable, but the
+  hygiene gap was real and trivial to close. Both interpolations
+  now go through a small `escapeHtml()` helper.
+
+### Compatibility
+
+- Pure additive defense in depth; no behavior change for any
+  legitimate use. Safe in-place upgrade from 0.15.1.
+
+### Implementation note for future maintainers
+
+If a new command is added to `activate()`, it must also be added
+to `ALLOWED_COMMAND_IDS` or the dispatcher will silently refuse
+it. The list lives directly above `executeCommandUri()` in
+`src/extension.ts` with a docstring explaining the threat model.
+
+
 
 ### Changed
 - **Hide inline `Validated with` / `Resources` labels.** The badge

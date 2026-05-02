@@ -443,16 +443,64 @@ function renderIntoPanel(
 		markdown = fs.readFileSync(uri.fsPath, 'utf-8');
 	} catch (exc) {
 		output.appendLine(`[labDashboard] read failed: ${exc}`);
-		panel.webview.html = `<pre>Failed to read ${uri.fsPath}: ${String(exc)}</pre>`;
+		// HTML-escape both interpolations: uri.fsPath can contain user-
+		// provided chars (the workspace path is fully user-controlled),
+		// and exc.toString() can contain whatever Node's error formatter
+		// includes — safest to assume neither is HTML-clean. CSP would
+		// already block any script execution this could enable, but
+		// hygiene is worth getting right at the source.
+		panel.webview.html = `<pre>Failed to read ${escapeHtml(uri.fsPath)}: ${escapeHtml(String(exc))}</pre>`;
 		return;
 	}
 	panel.title = titleFor(uri);
 	panel.webview.html = renderDashboardHtml(markdown, panel.webview);
 }
 
+/**
+ * Minimal HTML escaper for safe interpolation into error-state webview
+ * content. Not exported — only used in the read-failure fallback above.
+ * The main render path doesn't need this because renderDashboardHtml()
+ * goes through markdown-it (which handles escaping) and the post-
+ * processor only inserts class names and known-safe wrapper markup.
+ */
+function escapeHtml(s: string): string {
+	return s
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
 function titleFor(uri: vscode.Uri): string {
 	return `Lab Dashboard — ${path.basename(path.dirname(uri.fsPath))}`;
 }
+
+/**
+ * The set of `command:` URIs that the dashboard webview is allowed to
+ * dispatch. Matches the seven commands this extension actually
+ * registers in activate() (six declared in package.json's
+ * contributes.commands plus labDashboard.sshToNode which is registered
+ * in code).
+ *
+ * Scoping the dispatcher to this allowlist closes a post-compromise
+ * privilege-escalation door: a poisoned LAB-READY.md (planted by an
+ * attacker who already has workspace write access) can no longer
+ * trigger arbitrary VS Code commands like `workbench.action.terminal.
+ * sendSequence` or anything else from VS Code's broad command surface.
+ *
+ * If a new command is added to activate(), add it here too — the
+ * dispatcher will silently refuse anything that isn't on this list.
+ */
+const ALLOWED_COMMAND_IDS: ReadonlySet<string> = new Set([
+	'labDashboard.open',
+	'labDashboard.refresh',
+	'labDashboard.openTopology',
+	'labDashboard.openFile',
+	'labDashboard.runInTerminal',
+	'labDashboard.openTerminal',
+	'labDashboard.sshToNode',
+]);
 
 /**
  * Parse a `command:<id>?<url-encoded-json>` URI and dispatch via executeCommand.
@@ -461,6 +509,10 @@ function titleFor(uri: vscode.Uri): string {
  *   - JSON array in the query → spread as positional args to the command
  *   - JSON object in the query → pass as a single argument
  *   - No query                → no args
+ *
+ * The command ID is checked against ALLOWED_COMMAND_IDS before dispatch.
+ * Anything else is logged and rejected — see the allowlist's docstring
+ * for the threat model this protects against.
  */
 async function executeCommandUri(rawUri: string, output: vscode.OutputChannel): Promise<void> {
 	let uri: vscode.Uri;
@@ -475,6 +527,10 @@ async function executeCommandUri(rawUri: string, output: vscode.OutputChannel): 
 		return;
 	}
 	const commandId = uri.path;
+	if (!ALLOWED_COMMAND_IDS.has(commandId)) {
+		output.appendLine(`[labDashboard] refusing non-allowlisted command: ${commandId}`);
+		return;
+	}
 	let args: unknown[] = [];
 	if (uri.query) {
 		try {
