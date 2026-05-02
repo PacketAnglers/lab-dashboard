@@ -4,7 +4,70 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.2] - 2026-04-22
+## [0.15.0] - 2026-05-02
+
+### Changed
+- **Visual identity ported from `sandbox-dashboard`.** Users loved the
+  hero-card + action-card + outline-button system from
+  `PacketAnglers/sandbox-dashboard`; this release brings the same
+  language to `lab-dashboard`. The dashboard now reads as a hero card
+  at the top followed by a stack of action cards, rather than as a
+  long article. No markdown source changes are required — the
+  existing `LAB-READY.md` shape (header → `---` → sections) is
+  interpreted directly by the new post-processor.
+- **Hero card (`#lab-overview`).** The header block — lab name,
+  subtitle, status line, credentials, and the `Validated with` /
+  `Resources` badge rows — is now wrapped in a brand-pinned hero card
+  with a pale-blue background (`#EBF1F8`) and a 4px Arista Blue
+  (`#16325B`) left-border accent. Text colors inside the hero are
+  pinned to read consistently in both light and dark VS Code themes.
+- **Action cards.** Each `<hr>`-separated section after the hero
+  (Quick Actions, SSH to Nodes, Node Inventory, Tips, etc.) is now
+  wrapped in a subtle `.action-card` container — soft background, 1px
+  border, rounded corners. Section `<h2>` headers inside the card
+  render as a tiny uppercase letterspaced overline rather than the
+  prior border-bottomed heading. The card carries the visual weight;
+  the heading recedes.
+- **Quick Action buttons → outline grid.** Action buttons adopt
+  `sandbox-dashboard`'s outline aesthetic: transparent background,
+  theme-foreground text, soft 1px border, hover fills with
+  `--vscode-toolbar-hoverBackground`, `transform: scale(0.98)` on
+  click for tactile feedback. Buttons inside an action card lay out
+  as a responsive CSS grid (`repeat(auto-fit, minmax(220px, 1fr))`)
+  — typically 2 columns at standard webview widths, gracefully
+  collapsing to 1 on narrow panels and expanding to 3+ on wide ones.
+- **Per-button descriptions removed.** The descriptive paragraph
+  under each Quick Action button (e.g., "Inspect or edit the
+  `topology.clab.yml` source.") is dropped at render time to match
+  `sandbox-dashboard`'s compact grid. The button label + emoji
+  carries the meaning. Section-level descriptions (the prose that
+  appears between an `<h2>` and its content, e.g., the SSH section's
+  "One click → logged in.") are preserved.
+- **Two-tone Arista badge palette.** `Validated with` and `Resources`
+  badges now use the official Arista palette per the 2025 brand
+  guidelines: Arista Dark Gray (`#58585B`) label half, Arista Blue
+  (`#16325B`) value half, white text on both. Pinned hex on purpose
+  — brand colors must render identically in both light and dark
+  themes.
+- **SSH pills preserved unchanged.** The `.lab-ssh-pill` styling
+  introduced in v0.14.x — Arista Blue hover, `$ ` prefix, lift +
+  shadow on hover — is kept exactly as-is. SSH pills remain the
+  single brand-colored interaction surface, which is what lets the
+  brand color *mean* something rather than becoming the default
+  hover color for everything.
+
+### Compatibility
+- **No markdown source changes required.** Lab authors and the
+  `init_lab.py` generator (in `lab-base-techlib`) emit the same
+  markdown as before. The new post-processor (`wrapDashboardSections`
+  in `renderer.ts`) interprets the existing structure into the new
+  visual shape.
+- **No new commands, no behavior changes, no breaking changes.** Same
+  buttons, same number of buttons, same click targets. Pure
+  visual + DOM-shape refactor.
+- Safe in-place upgrade from 0.14.x.
+
+
 
 ### Changed
 - **Quick Action buttons are larger and more substantial.** Padding

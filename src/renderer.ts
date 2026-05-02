@@ -23,12 +23,22 @@ function md(): MarkdownIt {
  * Render the dashboard markdown as a self-contained HTML document suitable for
  * a WebviewPanel. Intercepts clicks on `<a href="command:...">` links and
  * posts them back to the extension host for dispatch.
+ *
+ * v0.15.0: visual identity ported from PacketAnglers/sandbox-dashboard. The
+ * dashboard now reads as a hero card + a stack of action cards rather than
+ * as an article. Markdown sources are unchanged — all transformation happens
+ * in `wrapDashboardSections()` below. Callers (lab-base-techlib's init_lab.py)
+ * do NOT need to update; the existing markdown shape is interpreted as:
+ *   - everything before the first <hr> → hero (#lab-overview)
+ *   - each subsequent <hr>-separated chunk → an .action-card
+ *   - inside an .action-card, runs of "h3 with a link, optional description"
+ *     become a compact button grid (.actions-row > a.action-btn)
  */
 export function renderDashboardHtml(
 	markdown: string,
 	webview: vscode.Webview
 ): string {
-	const body = wrapActionSections(md().render(markdown));
+	const body = wrapDashboardSections(md().render(markdown));
 	const nonce = makeNonce();
 	const cspSource = webview.cspSource;
 
@@ -67,76 +77,158 @@ function makeNonce(): string {
 }
 
 /**
- * Group action-style <h2> sections (currently "Quick Actions" and "Lab Operations")
- * into a side-by-side grid. Splits the rendered HTML at <hr> boundaries (which
- * the dashboard markdown uses as section separators), wraps consecutive action
- * sections in <div class="action-grid">, and reassembles. Non-action sections
- * pass through unchanged.
+ * Post-process markdown-it's HTML output into the sandbox-dashboard visual
+ * idiom: a single hero card at the top + one action-card per subsequent
+ * section. Buttons inside each card are coalesced into a compact responsive
+ * grid; per-button description paragraphs are dropped (per Mitch's design
+ * call — match sandbox-dashboard exactly).
  *
- * Heading-driven detection — no markdown changes required to add new action
- * sections in the future, just add the heading text to ACTION_HEADING_RE.
+ * Algorithm:
+ *   1. Split the rendered HTML on `<hr>` markers (markdown `---`). Markdown-it
+ *      emits each block element on its own line, which makes line-based
+ *      processing safe.
+ *   2. The first chunk becomes the hero (#lab-overview) — typically wraps the
+ *      h1, subtitle, status line, credentials block, and validated-with /
+ *      resources badge rows.
+ *   3. Each subsequent chunk becomes an .action-card. Inside each card, runs
+ *      of "h3 containing a single <a>, optionally followed by a one-line <p>
+ *      description" are coalesced into a <div class="actions-row"> grid of
+ *      <a class="action-btn"> elements. The h3 wrapper is dropped (it was
+ *      announcing as "heading level 3, link" — the new <a class="action-btn">
+ *      is correctly announced as just a link/button to assistive tech). The
+ *      description <p> is dropped to match sandbox-dashboard's compact grid.
+ *   4. Non-button content inside a card (h2 section header, prose, ssh
+ *      pills, details/summary, lists) passes through unchanged — the .action-
+ *      card visual container is enough on its own.
+ *
+ * Input shape examples this targets (post markdown-it):
+ *   <h3><a href="command:foo">Label</a></h3>           → button
+ *   <h3 id="x"><a href="https://...">Label</a></h3>    → button
+ *   <h3><a href="...">Label</a></h3>\n<p>desc</p>      → button (desc dropped)
+ *
+ * Anything else inside an h3 (e.g. <h3>Plain Heading</h3>) passes through —
+ * we only transform h3s whose entire content is a single anchor.
  */
-const ACTION_HEADING_RE = /<h2[^>]*>(?:[^<]*?)(?:Quick Actions|Lab Operations)/i;
-
-function wrapActionSections(html: string): string {
-	// Split on <hr> while keeping separators so we can reassemble exactly.
+function wrapDashboardSections(html: string): string {
+	// Split on each <hr> while keeping the separator in case we need it (we
+	// don't — cards provide visual separation — but the split with capture
+	// group makes the indexing easier to reason about).
 	const parts = html.split(/(<hr\s*\/?>)/i);
-	const out: string[] = [];
-	let groupBuf: string[] = [];
-	// Tracks whether the most recently emitted part was an action section
-	// in the current group — used to swallow the HR that separates it from
-	// the NEXT action section (since the grid provides its own visual separation).
-	let pendingHr: string | null = null;
 
-	const flushGroup = () => {
-		if (groupBuf.length === 0) {
+	// Rebuild as alternating content / hr. We only want the content chunks.
+	const chunks: string[] = [];
+	for (let i = 0; i < parts.length; i += 2) {
+		chunks.push(parts[i]);
+	}
+
+	if (chunks.length === 0) {
+		return html;
+	}
+
+	const out: string[] = [];
+
+	// First chunk → hero. Wrap unconditionally; if the chunk is empty (e.g.
+	// the markdown opens with `---`), we suppress the wrapper to avoid
+	// rendering an empty hero card.
+	const heroContent = chunks[0].trim();
+	if (heroContent.length > 0) {
+		out.push(`<div id="lab-overview">${heroContent}</div>`);
+	}
+
+	// Subsequent chunks → action cards.
+	for (let i = 1; i < chunks.length; i++) {
+		const cardContent = transformCardInterior(chunks[i]).trim();
+		if (cardContent.length === 0) {
+			continue;
+		}
+		out.push(`<div class="action-card">${cardContent}</div>`);
+	}
+
+	return out.join('\n');
+}
+
+/**
+ * Inside one action-card, find consecutive runs of (h3-with-anchor [+ p])
+ * and collapse them into a single <div class="actions-row"> of
+ * <a class="action-btn"> elements. Other content passes through.
+ *
+ * Markdown-it's output is line-oriented: each block element is on its own
+ * line. We exploit that: walk the lines, classify each, and coalesce.
+ */
+const H3_BUTTON_RE = /^<h3\b[^>]*>\s*<a\s+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>\s*<\/h3>$/;
+// A single-line <p>...</p> with no nested block elements. Used to detect
+// description paragraphs that should be dropped when they immediately follow
+// an h3-button. We match conservatively (`<p>...</p>` on one line only) so
+// multi-line prose blocks pass through untouched.
+const PARAGRAPH_LINE_RE = /^<p>[\s\S]*<\/p>$/;
+
+interface Button {
+	href: string;
+	label: string;
+}
+
+function transformCardInterior(rawHtml: string): string {
+	const lines = rawHtml.split('\n');
+	const out: string[] = [];
+	let buttonRun: Button[] = [];
+
+	const flushRun = () => {
+		if (buttonRun.length === 0) {
 			return;
 		}
-		if (groupBuf.length === 1) {
-			out.push(groupBuf[0]);
-		} else {
-			const sections = groupBuf.map((s) => `<section>${s}</section>`).join('');
-			out.push(`<div class="action-grid">${sections}</div>`);
-		}
-		groupBuf = [];
+		const buttons = buttonRun
+			.map((b) => `<a class="action-btn" href="${b.href}">${b.label}</a>`)
+			.join('\n');
+		out.push(`<div class="actions-row">\n${buttons}\n</div>`);
+		buttonRun = [];
 	};
 
-	for (const part of parts) {
-		const isHr = /^<hr/i.test(part);
-		const isAction = !isHr && ACTION_HEADING_RE.test(part);
-
-		if (isHr) {
-			if (groupBuf.length > 0) {
-				// We just collected an action section. Hold this HR — it'll be
-				// dropped if the next part is also an action (same group), or
-				// emitted if not (group ends).
-				pendingHr = part;
-			} else {
-				out.push(part);
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const trimmed = line.trim();
+		if (trimmed.length === 0) {
+			// Preserve blank lines in passthrough output, but don't break a
+			// pending button run — markdown-it sometimes emits blank lines
+			// between block elements and we don't want those to interrupt
+			// our coalescing.
+			if (buttonRun.length === 0) {
+				out.push(line);
 			}
 			continue;
 		}
 
-		if (isAction) {
-			// Same group continues — discard pending HR (grid handles spacing).
-			pendingHr = null;
-			groupBuf.push(part);
-		} else {
-			// Non-action content: flush group, then emit any pending HR, then this part.
-			flushGroup();
-			if (pendingHr !== null) {
-				out.push(pendingHr);
-				pendingHr = null;
+		const m = trimmed.match(H3_BUTTON_RE);
+		if (m) {
+			buttonRun.push({ href: m[1], label: m[2].trim() });
+			// Look ahead and consume a one-line description paragraph if
+			// present. Skip blank lines while looking. Stop looking on the
+			// first non-blank line — if it's a single-line <p>, drop it; if
+			// it's another h3-button, leave it for the next iteration; if
+			// it's anything else (h2, div, etc.), leave it.
+			let j = i + 1;
+			while (j < lines.length && lines[j].trim().length === 0) {
+				j++;
 			}
-			out.push(part);
+			if (j < lines.length) {
+				const nextTrimmed = lines[j].trim();
+				if (PARAGRAPH_LINE_RE.test(nextTrimmed) && !H3_BUTTON_RE.test(nextTrimmed)) {
+					// Drop the description paragraph (and the blank lines
+					// we walked over to find it). Per Mitch's design call:
+					// match sandbox-dashboard's compact grid, no per-button
+					// descriptions.
+					i = j;
+				}
+			}
+			continue;
 		}
+
+		// Not a button — flush any pending run and emit the line as-is.
+		flushRun();
+		out.push(line);
 	}
-	// Trailing edge: flush any final group, then any leftover pendingHr.
-	flushGroup();
-	if (pendingHr !== null) {
-		out.push(pendingHr);
-	}
-	return out.join('');
+	flushRun();
+
+	return out.join('\n');
 }
 
 function clickInterceptor(): string {
@@ -167,9 +259,18 @@ function clickInterceptor(): string {
 }
 
 function baseStyles(): string {
-	// Layout philosophy: dashboard is a launchpad, not an article. Full width,
-	// left-aligned, multi-column where it earns its keep. Action buttons are
-	// sized to content. Vertical rhythm tightened to fit more above the fold.
+	// v0.15.0 visual identity — direct port of sandbox-dashboard's hero +
+	// action-card + outline-btn system. The lab-dashboard CSS is now a
+	// near-clone of sandbox-dashboard's, with two divergences kept on
+	// purpose:
+	//   1. SSH pills (.lab-ssh-pill) — preserved from v0.14.x. Arista Blue
+	//      hover, $ prefix, lift + shadow on hover. These are the
+	//      single brand-colored interaction surface and predate this
+	//      refactor; users already love them.
+	//   2. Credentials chip row (.lab-credentials) — adapted to live inside
+	//      the brand-pinned hero. Background made transparent so the chips
+	//      sit on the hero's pale-blue field; the chips themselves keep
+	//      their own border + monospace identity.
 	return `
 		:root {
 			color-scheme: light dark;
@@ -177,33 +278,26 @@ function baseStyles(): string {
 		body {
 			font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif);
 			font-size: var(--vscode-font-size, 14px);
-			line-height: 1.5;
+			line-height: 1.6;
 			color: var(--vscode-foreground);
 			background: var(--vscode-editor-background);
 			margin: 0;
 			padding: 0;
 		}
 		.markdown-body {
-			padding: 1.25rem 2rem 3rem;
+			padding: 1.5rem 2rem 3rem;
 			box-sizing: border-box;
-			max-width: none;
+			max-width: 920px;
 		}
+
+		/* ── Generic typography (used inside cards) ──────────────────── */
 		h1, h2, h3, h4, h5, h6 {
 			margin-top: 1.2em;
 			margin-bottom: 0.4em;
 			font-weight: 600;
 			line-height: 1.2;
 		}
-		h1 { font-size: 1.7em; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 0.25em; margin-top: 0.1em; }
-		h2 { font-size: 1.25em; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 0.2em; }
-		h3 { font-size: 1em; margin-top: 1em; margin-bottom: 0.4em; font-weight: 500; }
-		h4 { font-size: 0.95em; }
-		p { margin: 0.35em 0; }
-		hr {
-			border: 0;
-			border-top: 1px solid var(--vscode-panel-border);
-			margin: 1em 0;
-		}
+		p { margin: 0.4em 0; }
 		a {
 			color: var(--vscode-textLink-foreground);
 			text-decoration: none;
@@ -264,148 +358,244 @@ function baseStyles(): string {
 		}
 		ul, ol { padding-left: 1.5em; margin: 0.4em 0; }
 		li + li { margin-top: 0.15em; }
+		sub, sup { font-size: 0.8em; }
+		small { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
+		img { max-width: 100%; height: auto; }
+		details > summary { cursor: pointer; }
 
-		/* ── Credentials block ─────────────────────────────────────────────
-		   Prominent callout with pill-styled values, sized for scanability. */
-		.lab-credentials {
-			display: flex;
-			align-items: center;
-			gap: 0.6em;
-			flex-wrap: wrap;
-			margin: 0.6em 0;
-			padding: 0.5em 0.9em;
-			background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.08));
-			border-left: 3px solid var(--vscode-textLink-foreground);
-			border-radius: 4px;
-			font-size: 1.05em;
+		/* ── Hero card (#lab-overview) ────────────────────────────────────
+		   Wraps everything before the first <hr>: lab name, subtitle,
+		   status line, credentials, validated-with / resources badges.
+		   Brand-pinned palette so every element inside reads consistently
+		   regardless of the user's VS Code theme — same reasoning as
+		   sandbox-dashboard's #lab-overview hero. */
+		#lab-overview {
+			margin: 0 0 1.5rem;
+			padding: 1rem 1.25rem 1.1rem;
+			border-radius: 6px;
+			background: #EBF1F8;
+			border-left: 4px solid #16325B;
 		}
-		.lab-credentials-label {
+		#lab-overview h1 {
+			margin: 0 0 0.3rem;
+			font-size: 1.4rem;
 			font-weight: 600;
-			color: var(--vscode-descriptionForeground);
-			text-transform: uppercase;
-			letter-spacing: 0.05em;
-			font-size: 0.8em;
+			color: #16325B;
+			border-bottom: none;
+			padding-bottom: 0;
 		}
-		.lab-cred {
-			padding: 0.2em 0.7em;
-			background: var(--vscode-editor-background);
-			border: 1px solid var(--vscode-panel-border);
-			border-radius: 4px;
-			font-family: var(--vscode-editor-font-family, 'SF Mono', Menlo, Consolas, monospace);
-			font-weight: 600;
-			font-size: 1em;
-			color: var(--vscode-foreground);
+		#lab-overview p {
+			margin: 0.25rem 0;
+			color: #1F2937;
 		}
-		.lab-cred-sep {
-			color: var(--vscode-descriptionForeground);
-			font-weight: 600;
+		#lab-overview p em {
+			color: #1F2937;
+			opacity: 0.85;
+		}
+		#lab-overview a {
+			color: #16325B;
+			text-decoration: underline;
+		}
+		#lab-overview a:hover {
+			color: #16325B;
+			opacity: 0.8;
+		}
+		#lab-overview hr {
+			display: none;
 		}
 
-		/* ── Validated-with badge row ───────────────────────────────────── */
-		.lab-validated-with {
+		/* Credentials chip row — adapted from v0.14.x. Background goes
+		   transparent inside the hero so the chips float on the pinned
+		   palette. The chips themselves retain a white-ish background +
+		   border so they read as inset pill values, matching the badge
+		   row visual rhythm directly below them. */
+		#lab-overview .lab-credentials {
 			display: flex;
 			align-items: center;
 			gap: 0.5em;
 			flex-wrap: wrap;
-			margin: 0.6em 0 0.9em;
+			margin: 0.6em 0;
+			padding: 0;
+			background: transparent;
+			border-left: none;
+			border-radius: 0;
+			font-size: 1em;
 		}
-		.lab-validated-label {
+		#lab-overview .lab-credentials-label {
 			font-weight: 600;
-			color: var(--vscode-descriptionForeground);
+			color: #58585B;
 			text-transform: uppercase;
 			letter-spacing: 0.05em;
-			font-size: 0.8em;
+			font-size: 0.78em;
+		}
+		#lab-overview .lab-cred {
+			padding: 0.2em 0.7em;
+			background: #FFFFFF;
+			border: 1px solid #C7D5E6;
+			border-radius: 4px;
+			font-family: var(--vscode-editor-font-family, 'SF Mono', Menlo, Consolas, monospace);
+			font-weight: 600;
+			font-size: 0.95em;
+			color: #16325B;
+		}
+		#lab-overview .lab-cred-sep {
+			color: #58585B;
+			font-weight: 600;
+		}
+
+		/* Validated-with / Resources badge rows. Two-tone shields.io style
+		   using the official Arista palette per
+		   https://www.arista.com/assets/data/pdf/Arista-Brand-Guidelines.pdf
+		   2025 edition — Dark Gray (#58585B) label half, Arista Blue
+		   (#16325B) value half, white text. Solid hex by design: brand
+		   colors render identically in both light and dark themes,
+		   regardless of the user's VS Code theme. */
+		#lab-overview .lab-validated-with {
+			display: flex;
+			align-items: center;
+			gap: 0.4em;
+			flex-wrap: wrap;
+			margin: 0.55em 0 0;
+		}
+		#lab-overview .lab-validated-label {
+			font-weight: 600;
+			color: #58585B;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			font-size: 0.78em;
 			margin-right: 0.2em;
 		}
-		.lab-badge {
+		#lab-overview .lab-badge {
 			display: inline-flex;
 			align-items: stretch;
 			border-radius: 4px;
 			overflow: hidden;
-			border: 1px solid var(--vscode-panel-border);
-			font-size: 0.9em;
-			line-height: 1.5;
+			font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+			font-size: 0.78rem;
+			line-height: 1.4;
+			border: none;
 		}
-		.lab-badge-key {
-			padding: 0.15em 0.55em;
-			background: var(--vscode-badge-background, var(--vscode-textBlockQuote-background, rgba(128,128,128,0.15)));
-			color: var(--vscode-badge-foreground, var(--vscode-foreground));
+		#lab-overview .lab-badge-key {
+			background: #58585B;
+			color: #FFFFFF;
+			padding: 0.22rem 0.55rem;
+			font-weight: 500;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+		}
+		#lab-overview .lab-badge-val {
+			background: #16325B;
+			color: #FFFFFF;
+			padding: 0.22rem 0.55rem;
 			font-weight: 600;
-		}
-		.lab-badge-val {
-			padding: 0.15em 0.6em;
-			background: var(--vscode-editor-background);
-			color: var(--vscode-foreground);
-			font-family: var(--vscode-editor-font-family, 'SF Mono', Menlo, Consolas, monospace);
-			font-weight: 500;
+			font-variant-numeric: tabular-nums;
+			font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 		}
 
-		/* Action sections side-by-side in a responsive grid. The wrapper is
-		   injected by the renderer so the dashboard markdown stays portable. */
-		.action-grid {
-			display: grid;
-			grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-			gap: 0.5rem 2rem;
-			align-items: start;
+		/* ── Action cards (.action-card) ──────────────────────────────────
+		   One per <hr>-separated section after the hero. Subtle bg + border
+		   + radius — the card itself carries visual weight; buttons inside
+		   recede slightly. Section h2 header sits inside the card as a
+		   tiny uppercase overline (the .actions-sub-h treatment from
+		   sandbox-dashboard, applied to h2s here since lab-dashboard's
+		   markdown uses ## for section headers). */
+		.action-card {
+			background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background, #252526));
+			border: 1px solid var(--vscode-panel-border, #3a3a3a);
+			border-radius: 5px;
+			padding: 0.85rem 1.1rem 1rem;
+			margin: 0 0 0.7rem;
 		}
-		.action-grid > section {
-			min-width: 0;
+		.action-card > :first-child {
+			margin-top: 0;
 		}
-
-		/* Action buttons: sized to content, not full width. Applies to any
-		   anchor inside an h3 — covers command: URIs AND external https links
-		   (e.g. Tech Library guide buttons). h3 is only used for action
-		   buttons in the dashboard, so this selector is safe.
-
-		   Sized to feel like the SSH pills' siblings — same lift + shadow
-		   family, but keeps the VS Code theme-driven hover color (rather
-		   than Arista Blue) so the dashboard preserves a clear hierarchy:
-		   Quick Actions are navigational, SSH pills are the branded
-		   node-interaction surface. */
-		h3 a[href] {
-			display: inline-block;
-			padding: 0.6em 1.2em;
-			background: var(--vscode-button-background);
-			color: var(--vscode-button-foreground) !important;
-			border-radius: 4px;
-			transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-			text-decoration: none;
-			font-weight: 500;
-			/* Explicit font-size so buttons don't inherit the smaller text
-			   from the surrounding context, which was making them look
-			   thin and small per user feedback. */
-			font-size: 1em;
+		.action-card > :last-child {
+			margin-bottom: 0;
 		}
-		h3 a[href]:hover {
-			background: var(--vscode-button-hoverBackground);
-			transform: translateY(-1px);
-			/* Soft shadow reinforces the "lift" — the button looks like it's
-			   physically rising off the page rather than just changing color.
-			   Using a translucent black lets the effect work on both light
-			   and dark VS Code themes without hardcoding a shadow color. */
-			box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-			text-decoration: none;
-		}
-		h3 a[href]:active {
-			transform: translateY(0);
-			box-shadow: none;
-		}
-
-		/* Description paragraph immediately after an action button — tighter and muted. */
-		h3:has(a[href]) + p {
-			margin: 0.2em 0 0.6em;
+		.action-card h2 {
+			font-size: 0.78rem;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
 			color: var(--vscode-descriptionForeground);
-			font-size: 0.9em;
+			margin: 0 0 0.7rem;
+			padding: 0;
+			border-bottom: none;
+		}
+		.action-card h2 a[href] {
+			color: inherit;
+			text-decoration: none;
+		}
+		/* Section description prose (e.g. SSH section's "One click → logged in...")
+		   sits between the h2 and the content — slightly muted, scannable. */
+		.action-card h2 + p {
+			color: var(--vscode-descriptionForeground);
+			font-size: 0.92rem;
+			margin: 0 0 0.7rem;
 		}
 
-		/* SSH-to-node pill grid. One pill per node, grouped by role.
-		   Compact (auto-sized to content), monospace, hover-highlighted.
-		   Scales cleanly from 4 to 30+ nodes without dominating the
-		   dashboard. The .lab-ssh-group label sits above each row of pills.
-		   The flex wrap means rows fill the available width and break
-		   naturally — no fixed grid column count to fight against. */
+		/* ── Action button grid (.actions-row > .action-btn) ──────────────
+		   The post-processor coalesces consecutive h3-anchor button blocks
+		   into this responsive grid. Buttons inside stretch to fill their
+		   grid column — visual rhythm + easy scanning. minmax(220px, 1fr)
+		   gives ~2 cols at typical webview widths, adapts to 1 col on
+		   narrow panels and up to 3+ on wide ones. Same shape as sandbox-
+		   dashboard's .actions-row to a CSS line. */
+		.actions-row {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 0.4rem;
+			margin: 0;
+		}
+		.action-btn {
+			/* Outline aesthetic from sandbox-dashboard v0.11.15. Transparent
+			   bg, theme-foreground text, soft border. Hover fills with
+			   --vscode-toolbar-hoverBackground (more harmonious than the
+			   saturated --vscode-button-hoverBackground). Active state uses
+			   transform: scale(0.98) for tactile click feedback without a
+			   color shift. */
+			display: inline-flex;
+			align-items: center;
+			justify-content: flex-start;
+			gap: 0.4rem;
+			text-align: left;
+			background: transparent;
+			color: var(--vscode-foreground, #cccccc) !important;
+			border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.15));
+			padding: 0.55rem 0.95rem;
+			font-size: 0.95rem;
+			font-family: var(--vscode-font-family);
+			border-radius: 4px;
+			cursor: pointer;
+			text-decoration: none;
+			transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.05s ease;
+		}
+		.action-btn:hover {
+			background-color: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.06));
+			border-color: var(--vscode-input-border, rgba(255, 255, 255, 0.25));
+			color: var(--vscode-foreground, #ffffff) !important;
+			text-decoration: none;
+		}
+		.action-btn:active {
+			transform: scale(0.98);
+		}
+		.action-btn:focus {
+			outline: 1px solid var(--vscode-focusBorder, #007fd4);
+			outline-offset: 2px;
+		}
+
+		/* ── SSH-to-node pills (preserved from v0.14.x) ───────────────────
+		   These predate the v0.15.0 refactor and users already love them.
+		   Arista Blue hover ties them to the brand identity and creates a
+		   deliberate hierarchy: action-btns are theme-driven navigational
+		   surfaces; SSH pills are the brand-colored node-interaction
+		   surface. The two systems are visually related (same lift +
+		   shadow family) but distinguishable. */
 		.lab-ssh-group {
-			margin: 0.6em 0 1em;
+			margin: 0.6em 0 0.5em;
+		}
+		.lab-ssh-group + .lab-ssh-group {
+			margin-top: 1em;
 		}
 		.lab-ssh-group-label {
 			display: block;
@@ -435,11 +625,6 @@ function baseStyles(): string {
 			transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 		}
 		.lab-ssh-pill:hover {
-			/* Arista Blue — the hover color ties SSH pills to the PacketAnglers
-			   / Arista visual identity and distinguishes them from the generic
-			   VS Code theme-driven Quick Action hover. White text required
-			   because #16325b is too dark for default foreground. !important
-			   overrides the badge-foreground variable set in the base rule. */
 			background: #16325b;
 			color: #ffffff !important;
 			border-color: #16325b;
@@ -451,7 +636,6 @@ function baseStyles(): string {
 			transform: translateY(0);
 			box-shadow: none;
 		}
-		/* Subtle "$" prefix to telegraph "this clicks into a terminal" */
 		.lab-ssh-pill::before {
 			content: '$ ';
 			opacity: 0.5;
@@ -459,9 +643,5 @@ function baseStyles(): string {
 		.lab-ssh-pill:hover::before {
 			opacity: 0.85;
 		}
-
-		sub, sup { font-size: 0.8em; }
-		small { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
-		img { max-width: 100%; height: auto; }
 	`;
 }
