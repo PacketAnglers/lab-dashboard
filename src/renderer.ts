@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as crypto from 'crypto';
 import MarkdownIt from 'markdown-it';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const taskLists = require('markdown-it-task-lists');
@@ -68,12 +69,10 @@ export function renderDashboardHtml(
 }
 
 function makeNonce(): string {
-	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-	let out = '';
-	for (let i = 0; i < 32; i++) {
-		out += chars.charAt(Math.floor(Math.random() * chars.length));
-	}
-	return out;
+	// 16 random bytes → 32 hex chars. crypto-grade instead of the
+	// Math.random() loop from VS Code's webview sample — same shape,
+	// strictly better source, zero cost on the Node side.
+	return crypto.randomBytes(16).toString('hex');
 }
 
 /**

@@ -231,6 +231,27 @@ export function activate(context: vscode.ExtensionContext) {
 				return;
 			}
 
+			// Both values are interpolated into a shell command via sendText
+			// below, and both originate from command URIs in the dashboard
+			// markdown. A poisoned LAB-READY.md gains nothing new here —
+			// runInTerminal is allowlisted arbitrary-shell by design — but
+			// there's no reason to pass unvalidated text into a shell when
+			// the legitimate value space is this narrow: SSH host aliases
+			// written by init_lab.py and lab usernames are strictly
+			// [A-Za-z0-9._-]. Rejecting everything else is simultaneously
+			// input hardening and a correctness guard (a node name with a
+			// space would silently produce a broken ssh command).
+			const SAFE_TOKEN_RE = /^[A-Za-z0-9._-]+$/;
+			if (!SAFE_TOKEN_RE.test(node) || !SAFE_TOKEN_RE.test(user)) {
+				vscode.window.showErrorMessage(
+					`labDashboard.sshToNode: refusing unsafe node/user value (allowed: letters, digits, . _ -)`
+				);
+				output.appendLine(
+					`[labDashboard] sshToNode: rejected node=${JSON.stringify(node)} user=${JSON.stringify(user)}`
+				);
+				return;
+			}
+
 			// Check our registry for an existing terminal for this node.
 			// We track by node name rather than by terminal reference so we
 			// can detect terminals the user closed (which removes them from
@@ -306,7 +327,10 @@ export function activate(context: vscode.ExtensionContext) {
 					cwd: initCwd,
 				});
 				term.show(false); // false = take focus so user sees the TUI
-				term.sendText(`python3 ${initScript}`, true);
+				// Quoted: the bundled path is constant, but the workspace-
+				// fallback path is wherever the user's folder lives — spaces
+				// in that path would otherwise split the argument.
+				term.sendText(`python3 "${initScript}"`, true);
 				output.appendLine('[labDashboard] init_lab launched');
 			};
 
@@ -408,6 +432,16 @@ function openDashboard(
 		if (msg.type === 'executeCommandUri' && typeof msg.uri === 'string') {
 			await executeCommandUri(msg.uri, output);
 		} else if (msg.type === 'openExternal' && typeof msg.uri === 'string') {
+			// The webview's click interceptor only forwards http(s) links,
+			// and CSP means only our nonce'd script can postMessage — but
+			// the host side shouldn't have to trust that. Re-check the
+			// scheme here so a future interceptor change (or any webview
+			// compromise) can't turn this handler into an arbitrary
+			// protocol launcher (file:, vscode:, ssh:, ...).
+			if (!/^https?:/i.test(msg.uri)) {
+				output.appendLine(`[labDashboard] refusing non-http(s) openExternal: ${msg.uri}`);
+				return;
+			}
 			try {
 				await vscode.env.openExternal(vscode.Uri.parse(msg.uri));
 			} catch (exc) {
