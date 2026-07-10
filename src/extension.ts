@@ -568,7 +568,18 @@ async function executeCommandUri(rawUri: string, output: vscode.OutputChannel): 
 	let args: unknown[] = [];
 	if (uri.query) {
 		try {
-			const parsed = JSON.parse(decodeURIComponent(uri.query));
+			// vscode.Uri.parse() returns .query ALREADY percent-decoded
+			// (verified empirically against vscode-uri, the package
+			// VS Code's Uri implementation is extracted from). Our one
+			// producer — init_lab.py's _build_*_uri helpers — encodes
+			// exactly once, so exactly one decode happens, and it happens
+			// inside Uri.parse. The previous decodeURIComponent(uri.query)
+			// here was a latent DOUBLE-decode: it threw "URI malformed"
+			// for any arg containing a literal % and silently corrupted
+			// args containing %20-as-data. Latent only because no current
+			// dashboard arg carries a % — caught by a parallel Day 50
+			// audit session, confirmed by experiment, fixed in v0.15.4.
+			const parsed = JSON.parse(uri.query);
 			args = Array.isArray(parsed) ? parsed : [parsed];
 		} catch (exc) {
 			output.appendLine(`[labDashboard] failed to parse args for ${commandId}: ${exc}`);

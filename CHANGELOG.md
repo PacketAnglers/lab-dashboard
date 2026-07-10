@@ -4,6 +4,26 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.4] - 2026-07-09
+
+### Fixed
+
+- **Command-URI arg double-decode.** `executeCommandUri()` called
+  `decodeURIComponent(uri.query)` — but `vscode.Uri.parse()` returns
+  `.query` already percent-decoded (verified empirically against
+  `vscode-uri`, the package VS Code's `Uri` is extracted from). The
+  second decode threw `URIError: URI malformed` for any command arg
+  containing a literal `%` and silently corrupted args containing
+  `%20`-as-data (e.g. URLs). Latent in every release since the
+  dispatcher was introduced: no current `init_lab.py` dashboard arg
+  carries a `%`, so every existing button worked by accident of
+  content. The dispatcher now parses `uri.query` directly — one encode
+  (init_lab.py) → one decode (Uri.parse) → JSON. Round-trip proven
+  exact for literal-%, %-as-data, object args, and space-bearing paths.
+
+  Found by a parallel Day 50 audit session whose read of this line was
+  better than this session's — reconciled in the saga, credit where due.
+
 ## [0.15.3] - 2026-07-09
 
 Full Code Zamboni pass (Day 50): dependency security, input hardening,
