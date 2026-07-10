@@ -68,11 +68,11 @@ export function renderDashboardHtml(
 	<meta charset="UTF-8">
 	<meta http-equiv="Content-Security-Policy" content="${csp}">
 	<title>Lab Dashboard</title>
-	<style>${baseStyles()}</style>
+	<style>${BASE_STYLES}</style>
 </head>
 <body class="vscode-body">
 	<article class="markdown-body">${body}</article>
-	<script nonce="${nonce}">${clickInterceptor()}</script>
+	<script nonce="${nonce}">${CLICK_INTERCEPTOR}</script>
 </body>
 </html>`;
 }
@@ -241,11 +241,12 @@ function transformCardInterior(rawHtml: string): string {
 	return out.join('\n');
 }
 
-function clickInterceptor(): string {
-	// Runs inside the webview. Captures clicks on anchor tags with `command:` scheme,
-	// prevents default (would silently no-op via openExternal), and posts them back
-	// to the extension host where we dispatch via vscode.commands.executeCommand().
-	return `
+// Runs inside the webview. Captures clicks on anchor tags with `command:` scheme,
+// prevents default (would silently no-op via openExternal), and posts them back
+// to the extension host where we dispatch via vscode.commands.executeCommand().
+// Module-level const: zero interpolation, so building it per render was pure
+// waste — hoisted in the Day 50 zamboni (behavior and bytes identical).
+const CLICK_INTERCEPTOR = `
 		const vscode = acquireVsCodeApi();
 		document.body.addEventListener('click', (ev) => {
 			const a = ev.target.closest && ev.target.closest('a[href]');
@@ -266,22 +267,26 @@ function clickInterceptor(): string {
 			// (VS Code's webview will handle or ignore as appropriate).
 		}, true);
 	`;
-}
 
-function baseStyles(): string {
-	// v0.15.0 visual identity — direct port of sandbox-dashboard's hero +
-	// action-card + outline-btn system. The lab-dashboard CSS is now a
-	// near-clone of sandbox-dashboard's, with two divergences kept on
-	// purpose:
-	//   1. SSH pills (.lab-ssh-pill) — preserved from v0.14.x. Arista Blue
-	//      hover, $ prefix, lift + shadow on hover. These are the
-	//      single brand-colored interaction surface and predate this
-	//      refactor; users already love them.
-	//   2. Credentials chip row (.lab-credentials) — adapted to live inside
-	//      the brand-pinned hero. Background made transparent so the chips
-	//      sit on the hero's pale-blue field; the chips themselves keep
-	//      their own border + monospace identity.
-	return `
+// v0.15.0 visual identity — direct port of sandbox-dashboard's hero +
+// action-card + outline-btn system. The lab-dashboard CSS is now a
+// near-clone of sandbox-dashboard's, with two divergences kept on
+// purpose:
+//   1. SSH pills (.lab-ssh-pill) — preserved from v0.14.x. Arista Blue
+//      hover, $ prefix, lift + shadow on hover. These are the
+//      single brand-colored interaction surface and predate this
+//      refactor; users already love them.
+//   2. Credentials chip row (.lab-credentials) — adapted to live inside
+//      the brand-pinned hero. Background made transparent so the chips
+//      sit on the hero's pale-blue field; the chips themselves keep
+//      their own border + monospace identity.
+//
+// Module-level const: zero interpolation (theme adaptation happens via
+// CSS variables at paint time, not string-build time), so rebuilding it
+// per render was pure waste — hoisted in the Day 50 zamboni. NOTE: the
+// CSS comments inside this literal SHIP to the webview as part of the
+// <style> block; edits to them change the rendered payload bytes.
+const BASE_STYLES = `
 		:root {
 			color-scheme: light dark;
 		}
@@ -658,4 +663,3 @@ function baseStyles(): string {
 			opacity: 0.85;
 		}
 	`;
-}
