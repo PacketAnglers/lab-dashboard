@@ -8,7 +8,15 @@ function md(): MarkdownIt {
 		return _md;
 	}
 	const m = new MarkdownIt({
-		html: true, // allow <sub>, <kbd>, &nbsp;, etc. — we trust content WE write
+		// html: true lets init_lab.py's authored markup through unsanitized
+		// (<span style=...>, <details>, <kbd>, &nbsp;, ...). The trust
+		// posture: LAB-READY.md is machine-written by init_lab.py inside a
+		// workspace the user chose to open, and the backstops for a
+		// poisoned file are (a) the CSP — script-src is nonce-only, which
+		// also blocks inline event handlers and javascript: URIs — and
+		// (b) the extension host's command allowlist. Raw HTML here cannot
+		// execute; at worst it renders.
+		html: true,
 		linkify: true,
 		breaks: false,
 		typographer: false,
@@ -41,7 +49,11 @@ export function renderDashboardHtml(
 	const cspSource = webview.cspSource;
 
 	// Strict CSP: no remote scripts, inline scripts only via nonce, images from
-	// anywhere (handy for future lab-specific icons), styles inline.
+	// anywhere (handy for future lab-specific icons), fonts local/data.
+	// style-src 'unsafe-inline' is LOAD-BEARING, not laziness: init_lab.py
+	// emits dozens of inline style= attributes (61 at last count) in its
+	// hero/status/pill markup, plus our own <style> block below. Tightening
+	// to a style nonce would silently strip all of that authored styling.
 	const csp = [
 		`default-src 'none'`,
 		`img-src ${cspSource} data: https:`,
@@ -163,6 +175,15 @@ function transformCardInterior(rawHtml: string): string {
 		if (buttonRun.length === 0) {
 			return;
 		}
+		// SAFETY INVARIANT — do not "fix" the lack of escaping here:
+		// href and label were captured from markdown-it's own output, which
+		// is already attribute/HTML-escaped. href matched [^"]+ so it cannot
+		// contain a raw quote — attribute breakout is impossible — and label
+		// is re-emitted with exactly the escaping it arrived with (it may
+		// legitimately contain inline tags like <code>). Escaping AGAIN
+		// would double-encode entities and corrupt labels. If a new source
+		// of button data is ever added that does NOT come from markdown-it
+		// output, that source must be escaped before reaching this point.
 		const buttons = buttonRun
 			.map((b) => `<a class="action-btn" href="${b.href}">${b.label}</a>`)
 			.join('\n');
@@ -488,9 +509,10 @@ function baseStyles(): string {
 		   One per <hr>-separated section after the hero. Subtle bg + border
 		   + radius — the card itself carries visual weight; buttons inside
 		   recede slightly. Section h2 header sits inside the card as a
-		   tiny uppercase overline (the .actions-sub-h treatment from
-		   sandbox-dashboard, applied to h2s here since lab-dashboard's
-		   markdown uses ## for section headers). */
+		   tiny uppercase overline (visually matching what sandbox-dashboard
+		   does with its .actions-sub-h class — a class that does NOT exist
+		   here; lab-dashboard applies the same treatment to bare h2s since
+		   its markdown uses ## for section headers). */
 		.action-card {
 			background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background, #252526));
 			border: 1px solid var(--vscode-panel-border, #3a3a3a);

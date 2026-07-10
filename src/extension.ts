@@ -76,7 +76,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Watch for creation/modification/deletion. We deliberately do NOT scan
 	// for existing files at activation — a LAB-READY.md left over from a prior
 	// session would otherwise auto-open with stale data while the lab is still
-	// booting. Trust the file event: lab_start.py deletes the stale file at
+	// booting. Trust the file event: init_lab.py deletes the stale file at
 	// startup and writes a fresh one only when the lab is actually ready.
 	const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 	watcher.onDidCreate((uri) => {
@@ -105,7 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 	context.subscriptions.push(watcher);
 
-	// 3. Manual commands.
+	// ── Manual commands ────────────────────────────────────────────────────
 	context.subscriptions.push(
 		vscode.commands.registerCommand('labDashboard.open', async () => {
 			const uris = await vscode.workspace.findFiles(pattern, '**/node_modules/**', 20);
@@ -269,7 +269,7 @@ export function activate(context: vscode.ExtensionContext) {
 			output.appendLine(`[labDashboard] sshToNode: opening terminal for ${user}@${node}`);
 			const term = vscode.window.createTerminal({ name: node });
 			sshTerminals.set(node, term);
-			term.show(false);
+			term.show(false); // false = take focus
 			// true = include trailing newline → command runs immediately
 			term.sendText(`ssh ${user}@${node}`, true);
 		})
