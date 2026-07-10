@@ -4,6 +4,70 @@ All notable changes to the Lab Dashboard extension are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.3] - 2026-07-09
+
+Full Code Zamboni pass (Day 50): dependency security, input hardening,
+dead code, comment accuracy, and one free optimization. Five commits,
+each gated by a render harness fed with real `init_lab.py` output from
+a 43-node lab — passes claiming "no observable change" were held to
+byte-identical rendered HTML.
+
+### Security
+
+- **Patched linkify-it ReDoS (HIGH, GHSA-22p9-wv53-3rq4).** The
+  renderer runs `linkify: true`, so dashboard text flowed through the
+  vulnerable quadratic scan on every render — a poisoned `LAB-READY.md`
+  could CPU-burn the extension host. Lockfile-only fix: markdown-it
+  14.1.0 → 14.3.0, linkify-it 5.0.0 → 5.0.2. Also clears the
+  markdown-it smartquotes advisory (MODERATE — not exploitable here:
+  `typographer: false`) and the build-toolchain advisories. `npm audit`
+  now reports zero vulnerabilities, full tree and runtime.
+- **`sshToNode` validates `node` and `user` against
+  `^[A-Za-z0-9._-]+$`** before interpolating into the ssh command.
+  Not an escalation fix (`runInTerminal` is allowlisted arbitrary-shell
+  by design, behind workspace trust) — it refuses unvalidated shell
+  input on principle and fixes a real correctness bug: node names with
+  spaces silently produced broken ssh commands.
+- **Host-side scheme check on `openExternal`.** The webview interceptor
+  only forwards http(s) and CSP restricts script to our nonce, but the
+  extension host no longer has to trust either — non-http(s) URIs are
+  refused at the handler.
+- **Crypto-grade webview nonce.** `crypto.randomBytes(16).toString('hex')`
+  replaces the `Math.random()` loop from VS Code's sample.
+- **Quoted the `init_lab.py` launch path** — workspace-fallback paths
+  containing spaces no longer split the argument.
+
+### Removed
+
+- **`markdown-it-task-lists` dependency.** `init_lab.py` emits zero
+  task-list syntax and the plugin was loaded with `enabled: false`.
+  Rendering of every real dashboard is byte-identical without it.
+- Unreachable branches in the renderer (a `split()` capture-group
+  rebuild loop, an impossible empty-array guard, a dead regex
+  conjunct) and `.vscodeignore` fossils from the pre-bundling era.
+
+### Documentation
+
+- Comment corrections and posture documentation: the `html: true`
+  trust model and its CSP/allowlist backstops; why `style-src
+  'unsafe-inline'` is load-bearing (61 inline `style=` attributes
+  emitted by `init_lab.py`); the `flushRun` re-emission safety
+  invariant (markdown-it pre-escapes; escaping again would corrupt
+  labels); stale `lab_start.py` → `init_lab.py`; restored the missing
+  `[0.15.1]` header in this changelog.
+
+### Performance
+
+- Hoisted the zero-interpolation `<style>` and click-interceptor
+  template literals to module consts (built once, not per render).
+
+### Compatibility
+
+- No behavior change for any real dashboard. Safe in-place upgrade
+  from 0.15.2. (Hypothetical hand-authored `- [ ]` task-list lines
+  now render as literal list text — no `init_lab.py` output contains
+  any.)
+
 ## [0.15.2] - 2026-05-02
 
 Security hardening identified by an end-of-day Zamboni audit pass.
@@ -46,7 +110,7 @@ to `ALLOWED_COMMAND_IDS` or the dispatcher will silently refuse
 it. The list lives directly above `executeCommandUri()` in
 `src/extension.ts` with a docstring explaining the threat model.
 
-
+## [0.15.1] - 2026-05-02
 
 ### Changed
 - **Hide inline `Validated with` / `Resources` labels.** The badge
