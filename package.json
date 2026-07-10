@@ -80,8 +80,7 @@
     "package": "npm run bundle && vsce package --no-dependencies"
   },
   "dependencies": {
-    "markdown-it": "^14.1.0",
-    "markdown-it-task-lists": "^2.1.1"
+    "markdown-it": "^14.1.0"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",

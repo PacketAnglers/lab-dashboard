@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import MarkdownIt from 'markdown-it';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const taskLists = require('markdown-it-task-lists');
 
 let _md: MarkdownIt | undefined;
 function md(): MarkdownIt {
@@ -15,7 +13,6 @@ function md(): MarkdownIt {
 		breaks: false,
 		typographer: false,
 	});
-	m.use(taskLists, { enabled: false, label: true });
 	_md = m;
 	return m;
 }
@@ -109,20 +106,11 @@ function makeNonce(): string {
  * we only transform h3s whose entire content is a single anchor.
  */
 function wrapDashboardSections(html: string): string {
-	// Split on each <hr> while keeping the separator in case we need it (we
-	// don't — cards provide visual separation — but the split with capture
-	// group makes the indexing easier to reason about).
-	const parts = html.split(/(<hr\s*\/?>)/i);
-
-	// Rebuild as alternating content / hr. We only want the content chunks.
-	const chunks: string[] = [];
-	for (let i = 0; i < parts.length; i += 2) {
-		chunks.push(parts[i]);
-	}
-
-	if (chunks.length === 0) {
-		return html;
-	}
+	// Split on each <hr> (markdown `---`). The separators themselves are
+	// discarded — cards provide the visual separation. String.split always
+	// returns at least one element, so chunks[0] exists even for input
+	// with no <hr> at all.
+	const chunks = html.split(/<hr\s*\/?>/i);
 
 	const out: string[] = [];
 
@@ -210,7 +198,9 @@ function transformCardInterior(rawHtml: string): string {
 			}
 			if (j < lines.length) {
 				const nextTrimmed = lines[j].trim();
-				if (PARAGRAPH_LINE_RE.test(nextTrimmed) && !H3_BUTTON_RE.test(nextTrimmed)) {
+				// (A line starting <p> can never also match H3_BUTTON_RE —
+				// the two regexes are mutually exclusive on the first tag.)
+				if (PARAGRAPH_LINE_RE.test(nextTrimmed)) {
 					// Drop the description paragraph (and the blank lines
 					// we walked over to find it). Per Mitch's design call:
 					// match sandbox-dashboard's compact grid, no per-button
