@@ -45,6 +45,9 @@ byte-identical rendered HTML.
 - Unreachable branches in the renderer (a `split()` capture-group
   rebuild loop, an impossible empty-array guard, a dead regex
   conjunct) and `.vscodeignore` fossils from the pre-bundling era.
+- `.github/**` from the packaged vsix — the release workflow file had
+  been shipping inside the extension package since at least 0.15.2
+  (harmless, but not the extension's business to distribute).
 
 ### Documentation
 
